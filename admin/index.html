@@ -1,0 +1,2468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>指令集 - 运营后台管理系统</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Tailwind 自定义配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#FF6B9D',
+            'brand-light': '#FFB3C6',
+            'brand-dark': '#E5507A',
+            sidebar: '#1F2937',
+            'sidebar-hover': '#374151',
+            'sidebar-active': '#FF6B9D',
+            'content-bg': '#F9FAFB',
+            'card-bg': '#FFFFFF',
+          },
+          fontFamily: {
+            system: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', '"PingFang SC"', '"Microsoft YaHei"', 'sans-serif'],
+          },
+          minWidth: {
+            'admin': '1024px',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* ========== 全局基础样式 ========== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: #F9FAFB;
+      color: #1F2937;
+      min-width: 1024px;
+    }
+
+    /* ========== 滚动条美化 ========== */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #D1D5DB;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #9CA3AF;
+    }
+
+    /* ========== 侧边栏导航项动画 ========== */
+    .nav-item {
+      transition: all 0.2s ease;
+    }
+    .nav-item:hover {
+      background-color: #374151;
+    }
+    .nav-item.active {
+      background-color: #FF6B9D !important;
+      color: #FFFFFF !important;
+    }
+    .nav-item.active i {
+      color: #FFFFFF;
+    }
+
+    /* ========== 统计卡片悬浮效果 ========== */
+    .stat-card {
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    /* ========== 柱状图样式 ========== */
+    .bar-chart-container {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      height: 200px;
+      padding: 0 8px;
+    }
+    .bar-group {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .bar-wrapper {
+      width: 100%;
+      height: 160px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .bar {
+      width: 32px;
+      border-radius: 6px 6px 2px 2px;
+      transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      min-height: 4px;
+      cursor: pointer;
+    }
+    .bar:hover {
+      opacity: 0.85;
+    }
+    .bar .bar-tooltip {
+      position: absolute;
+      top: -28px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1F2937;
+      color: white;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .bar:hover .bar-tooltip {
+      opacity: 1;
+    }
+    .bar-label {
+      font-size: 12px;
+      color: #6B7280;
+    }
+
+    /* ========== 表格斑马纹 ========== */
+    .data-table tbody tr:nth-child(even) {
+      background-color: #F9FAFB;
+    }
+    .data-table tbody tr:hover {
+      background-color: #FDF2F8 !important;
+    }
+
+    /* ========== 弹窗遮罩动画 ========== */
+    .modal-overlay {
+      animation: fadeIn 0.2s ease;
+    }
+    .modal-content-card {
+      animation: slideUp 0.25s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ========== Toast 提示动画 ========== */
+    .toast {
+      animation: toastIn 0.3s ease;
+    }
+    .toast.hiding {
+      animation: toastOut 0.3s ease forwards;
+    }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateX(100%); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes toastOut {
+      from { opacity: 1; transform: translateX(0); }
+      to { opacity: 0; transform: translateX(100%); }
+    }
+
+    /* ========== 按钮过渡 ========== */
+    button {
+      transition: all 0.15s ease;
+    }
+
+    /* ========== 状态标签样式 ========== */
+    .status-active {
+      background-color: #D1FAE5;
+      color: #065F46;
+    }
+    .status-inactive {
+      background-color: #FEE2E2;
+      color: #991B1B;
+    }
+    .status-pending {
+      background-color: #FEF3C7;
+      color: #92400E;
+    }
+    .status-resolved {
+      background-color: #D1FAE5;
+      color: #065F46;
+    }
+
+    /* ========== 操作记录时间线 ========== */
+    .timeline-item {
+      position: relative;
+      padding-left: 28px;
+      padding-bottom: 16px;
+    }
+    .timeline-item:not(:last-child)::before {
+      content: '';
+      position: absolute;
+      left: 5px;
+      top: 12px;
+      bottom: 0;
+      width: 2px;
+      background: #E5E7EB;
+    }
+    .timeline-dot {
+      position: absolute;
+      left: 0;
+      top: 4px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid #FF6B9D;
+      background: white;
+    }
+
+    /* ========== 输入框聚焦样式 ========== */
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #FF6B9D;
+      box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.15);
+    }
+
+    /* ========== 隐藏页面 ========== */
+    .page-content {
+      display: none;
+    }
+    .page-content.active {
+      display: block;
+    }
+    /* 裁剪手柄 */
+    .crop-handle {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background: white;
+      border: 2px solid #FF6B9D;
+      border-radius: 2px;
+      z-index: 10;
+    }
+    .crop-handle.nw { top: -8px; left: -8px; cursor: nw-resize; }
+    .crop-handle.ne { top: -8px; right: -8px; cursor: ne-resize; }
+    .crop-handle.sw { bottom: -8px; left: -8px; cursor: sw-resize; }
+    .crop-handle.se { bottom: -8px; right: -8px; cursor: se-resize; }
+    .crop-handle-edge {
+      position: absolute;
+      z-index: 10;
+    }
+    .crop-handle-edge.n { top: -4px; left: 20%; right: 20%; height: 8px; cursor: n-resize; }
+    .crop-handle-edge.s { bottom: -4px; left: 20%; right: 20%; height: 8px; cursor: s-resize; }
+    .crop-handle-edge.e { right: -4px; top: 20%; bottom: 20%; width: 8px; cursor: e-resize; }
+    .crop-handle-edge.w { left: -4px; top: 20%; bottom: 20%; width: 8px; cursor: w-resize; }
+  </style>
+</head>
+<body class="min-w-admin bg-content-bg font-system">
+
+  <!-- ============================================================ -->
+  <!-- 登录页面 -->
+  <!-- ============================================================ -->
+  <div id="login-page" class="hidden fixed inset-0 bg-gradient-to-br from-pink-50 via-white to-purple-50 z-[200] flex items-center justify-center">
+    <div class="w-[400px]">
+      <div class="text-center mb-8">
+        <div class="w-16 h-16 bg-brand rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand/30">
+          <i data-lucide="sparkles" class="w-8 h-8 text-white"></i>
+        </div>
+        <h1 class="text-2xl font-bold text-gray-800">指令集后台</h1>
+        <p class="text-gray-500 text-sm mt-1">请登录管理员账号</p>
+      </div>
+      <div class="bg-white rounded-2xl shadow-xl shadow-gray-200/50 p-8 border border-gray-100">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">用户名</label>
+            <input type="text" id="login-username" class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50" placeholder="请输入用户名" onkeydown="if(event.key==='Enter')document.getElementById('login-password').focus()">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">密码</label>
+            <input type="password" id="login-password" class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50" placeholder="请输入密码" onkeydown="if(event.key==='Enter')handleLogin()">
+          </div>
+          <div id="login-error" class="hidden text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg"></div>
+          <button onclick="handleLogin()" id="login-btn" class="w-full py-3 bg-brand text-white rounded-xl text-sm font-medium hover:bg-brand-dark transition-colors">
+            登 录
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================================ -->
+  <!-- 主布局：左侧导航 + 右侧内容区 -->
+  <!-- ============================================================ -->
+  <div class="flex min-h-screen">
+
+    <!-- ========== 左侧导航栏 ========== -->
+    <aside class="w-60 bg-sidebar flex flex-col fixed h-full z-30 shadow-lg">
+      <!-- Logo 区域 -->
+      <div class="px-5 py-6 border-b border-gray-700">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-brand rounded-lg flex items-center justify-center">
+            <i data-lucide="sparkles" class="w-5 h-5 text-white"></i>
+          </div>
+          <div>
+            <h1 class="text-white text-base font-bold tracking-wide">指令集后台</h1>
+            <p class="text-gray-500 text-xs mt-0.5">管理控制台 v1.0</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 导航菜单 -->
+      <nav class="flex-1 py-4 px-3 space-y-1">
+        <div class="nav-item active flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer text-gray-300"
+             data-page="dashboard" onclick="switchPage('dashboard')">
+          <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+          <span class="text-sm font-medium">数据看板</span>
+        </div>
+        <div class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer text-gray-300"
+             data-page="prompts" onclick="switchPage('prompts')">
+          <i data-lucide="file-text" class="w-5 h-5"></i>
+          <span class="text-sm font-medium">指令管理</span>
+        </div>
+        <div class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer text-gray-300"
+             id="nav-banners" data-page="banners" onclick="switchPage('banners')">
+          <i data-lucide="image" class="w-5 h-5"></i>
+          <span class="text-sm font-medium">Banners</span>
+        </div>
+        <div class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer text-gray-300"
+             data-page="users" onclick="switchPage('users')">
+          <i data-lucide="users" class="w-5 h-5"></i>
+          <span class="text-sm font-medium">用户管理</span>
+        </div>
+        <div class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer text-gray-300"
+             data-page="feedback" onclick="switchPage('feedback')">
+          <i data-lucide="message-square" class="w-5 h-5"></i>
+          <span class="text-sm font-medium">反馈管理</span>
+        </div>
+      </nav>
+
+      <!-- 底部：退出登录 -->
+      <div class="px-3 py-4 border-t border-gray-700">
+        <button onclick="handleLogout()"
+                class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:text-red-400 hover:bg-gray-800 text-sm">
+          <i data-lucide="log-out" class="w-5 h-5"></i>
+          <span>退出登录</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ========== 右侧主内容区 ========== -->
+    <div class="flex-1 ml-60 flex flex-col min-h-screen">
+
+      <!-- ===== 顶部 Header ===== -->
+      <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-20">
+        <div class="flex items-center gap-3">
+          <h2 id="page-title" class="text-lg font-semibold text-gray-800">数据看板</h2>
+        </div>
+        <div class="flex items-center gap-4">
+          <!-- 通知铃铛 -->
+          <button class="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg">
+            <i data-lucide="bell" class="w-5 h-5"></i>
+            <span class="absolute top-1 right-1 w-2 h-2 bg-brand rounded-full"></span>
+          </button>
+          <!-- 管理员头像 -->
+          <div class="flex items-center gap-3 pl-4 border-l border-gray-200">
+            <div class="w-8 h-8 bg-brand rounded-full flex items-center justify-center">
+              <i data-lucide="user" class="w-4 h-4 text-white"></i>
+            </div>
+            <span class="text-sm font-medium text-gray-700">管理员</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- ===== 内容区域 ===== -->
+      <main class="flex-1 p-6 overflow-y-auto">
+
+        <!-- =========================================== -->
+        <!-- 页面 1: Dashboard 数据看板 -->
+        <!-- =========================================== -->
+        <div id="page-dashboard" class="page-content active">
+          <!-- 统计卡片 -->
+          <div class="grid grid-cols-4 gap-5 mb-6">
+            <!-- 总用户数 -->
+            <div class="stat-card bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+              <div class="flex items-center justify-between mb-3">
+                <div class="w-11 h-11 bg-blue-50 rounded-lg flex items-center justify-center">
+                  <i data-lucide="users" class="w-5 h-5 text-blue-500"></i>
+                </div>
+                <span class="text-xs text-green-500 font-medium bg-green-50 px-2 py-0.5 rounded-full">
+                  <i data-lucide="trending-up" class="w-3 h-3 inline-block mr-0.5"></i>+12%
+                </span>
+              </div>
+              <div class="text-2xl font-bold text-gray-900" id="stat-total-users">0</div>
+              <div class="text-sm text-gray-500 mt-1">总用户数</div>
+            </div>
+            <!-- 今日新增 -->
+            <div class="stat-card bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+              <div class="flex items-center justify-between mb-3">
+                <div class="w-11 h-11 bg-green-50 rounded-lg flex items-center justify-center">
+                  <i data-lucide="user-plus" class="w-5 h-5 text-green-500"></i>
+                </div>
+                <span class="text-xs text-green-500 font-medium bg-green-50 px-2 py-0.5 rounded-full">
+                  <i data-lucide="trending-up" class="w-3 h-3 inline-block mr-0.5"></i>+5%
+                </span>
+              </div>
+              <div class="text-2xl font-bold text-gray-900" id="stat-today-new">0</div>
+              <div class="text-sm text-gray-500 mt-1">今日新增</div>
+            </div>
+            <!-- 今日复制量 -->
+            <div class="stat-card bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+              <div class="flex items-center justify-between mb-3">
+                <div class="w-11 h-11 bg-purple-50 rounded-lg flex items-center justify-center">
+                  <i data-lucide="copy" class="w-5 h-5 text-purple-500"></i>
+                </div>
+                <span class="text-xs text-red-500 font-medium bg-red-50 px-2 py-0.5 rounded-full">
+                  <i data-lucide="trending-down" class="w-3 h-3 inline-block mr-0.5"></i>-8%
+                </span>
+              </div>
+              <div class="text-2xl font-bold text-gray-900" id="stat-today-copies">0</div>
+              <div class="text-sm text-gray-500 mt-1">今日复制量</div>
+            </div>
+            <!-- 今日广告解锁量 -->
+            <div class="stat-card bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+              <div class="flex items-center justify-between mb-3">
+                <div class="w-11 h-11 bg-orange-50 rounded-lg flex items-center justify-center">
+                  <i data-lucide="tv" class="w-5 h-5 text-orange-500"></i>
+                </div>
+                <span class="text-xs text-green-500 font-medium bg-green-50 px-2 py-0.5 rounded-full">
+                  <i data-lucide="trending-up" class="w-3 h-3 inline-block mr-0.5"></i>+3%
+                </span>
+              </div>
+              <div class="text-2xl font-bold text-gray-900" id="stat-today-ads">0</div>
+              <div class="text-sm text-gray-500 mt-1">今日广告解锁量</div>
+            </div>
+          </div>
+
+          <!-- 柱状图 + 热门指令 TOP 5 并排 -->
+          <div class="grid grid-cols-3 gap-5 mb-6">
+            <!-- 7 天复制量趋势（占 2 列） -->
+            <div class="col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-base font-semibold text-gray-800">7 天复制量趋势</h3>
+                <span class="text-xs text-gray-400">最近 7 天</span>
+              </div>
+              <div class="bar-chart-container" id="bar-chart">
+                <!-- 由 JS 动态渲染 -->
+              </div>
+            </div>
+
+            <!-- 热门指令 TOP 5（占 1 列） -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-base font-semibold text-gray-800">热门指令 TOP 5</h3>
+                <i data-lucide="flame" class="w-4 h-4 text-brand"></i>
+              </div>
+              <div id="hot-prompts-list" class="space-y-3">
+                <!-- 由 JS 动态渲染 -->
+              </div>
+            </div>
+          </div>
+
+          <!-- 最近操作记录 -->
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-base font-semibold text-gray-800">最近操作记录</h3>
+              <span class="text-xs text-brand cursor-pointer hover:underline">查看全部</span>
+            </div>
+            <div id="recent-logs" class="space-y-0">
+              <!-- 由 JS 动态渲染 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- =========================================== -->
+        <!-- 页面 2: 指令管理 -->
+        <!-- =========================================== -->
+        <div id="page-prompts" class="page-content">
+          <!-- 工具栏 -->
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-5">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <!-- 搜索框 -->
+                <div class="relative">
+                  <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                  <input type="text" id="prompt-search-input" placeholder="搜索指令标题..."
+                         class="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm w-64 bg-gray-50"
+                         oninput="filterPrompts()">
+                </div>
+                <!-- 分类筛选 -->
+                <div class="relative inline-flex items-center">
+                  <select id="prompt-category-filter" class="px-4 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 pr-8 appearance-none"
+                          onchange="filterPrompts()">
+                  </select>
+                  <button onclick="openCategoryManager()" class="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-brand" title="管理分类">
+                    <i data-lucide="settings" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
+                <!-- 状态筛选 -->
+                <select id="prompt-status-filter" class="px-4 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50"
+                        onchange="filterPrompts()">
+                  <option value="">全部状态</option>
+                  <option value="active">已上架</option>
+                  <option value="inactive">已下架</option>
+                </select>
+              </div>
+              <!-- 添加指令按钮 -->
+              <button onclick="openPromptModal()"
+                      class="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded-lg text-sm font-medium hover:bg-brand-dark">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>添加指令</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 指令列表表格 -->
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <table class="data-table w-full">
+              <thead>
+                <tr class="bg-gray-50 border-b border-gray-200">
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">ID</th>
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">标题</th>
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">分类</th>
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">消耗积分</th>
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">复制量</th>
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">状态</th>
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">标签</th>
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">操作</th>
+                </tr>
+              </thead>
+              <tbody id="prompts-table-body">
+                <!-- 由 JS 动态渲染 -->
+              </tbody>
+            </table>
+            <!-- 无数据提示 -->
+            <div id="prompts-empty" class="hidden py-16 text-center text-gray-400">
+              <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3 text-gray-300"></i>
+              <p class="text-sm">暂无匹配的指令数据</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- =========================================== -->
+        <!-- Banner 管理 -->
+        <!-- =========================================== -->
+        <div id="page-banners" class="page-content">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-xl font-bold text-gray-800">Banner 管理</h2>
+            <button onclick="openBannerModal()" class="px-4 py-2 bg-brand text-white rounded-lg text-sm font-medium hover:bg-brand-dark flex items-center gap-1.5">
+              <i data-lucide="plus" class="w-4 h-4"></i> 添加 Banner
+            </button>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+            <table class="w-full">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">预览</th>
+                  <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">标题</th>
+                  <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">副标题</th>
+                  <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">跳转类型</th>
+                  <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">跳转参数</th>
+                  <th class="px-5 py-3 text-center text-xs font-semibold text-gray-500 uppercase">状态</th>
+                  <th class="px-5 py-3 text-center text-xs font-semibold text-gray-500 uppercase">排序</th>
+                  <th class="px-5 py-3 text-center text-xs font-semibold text-gray-500 uppercase">操作</th>
+                </tr>
+              </thead>
+              <tbody id="banner-table-body">
+                <!-- JS 动态渲染 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- =========================================== -->
+        <!-- 页面 3: 用户管理 -->
+        <!-- =========================================== -->
+        <div id="page-users" class="page-content">
+          <!-- 工具栏 -->
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-5">
+            <div class="flex items-center justify-between">
+              <div class="relative">
+                <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                <input type="text" id="user-search-input" placeholder="搜索用户昵称..."
+                       class="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm w-64 bg-gray-50"
+                       oninput="filterUsers()">
+              </div>
+              <div class="text-sm text-gray-500">
+                共 <span id="users-total-count" class="font-semibold text-gray-800">0</span> 位用户
+              </div>
+            </div>
+          </div>
+
+          <!-- 用户列表表格 -->
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <table class="data-table w-full">
+              <thead>
+                <tr class="bg-gray-50 border-b border-gray-200">
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">ID</th>
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">昵称</th>
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">积分余额</th>
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">注册时间</th>
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">操作</th>
+                </tr>
+              </thead>
+              <tbody id="users-table-body">
+                <!-- 由 JS 动态渲染 -->
+              </tbody>
+            </table>
+            <div id="users-empty" class="hidden py-16 text-center text-gray-400">
+              <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3 text-gray-300"></i>
+              <p class="text-sm">暂无匹配的用户数据</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- =========================================== -->
+        <!-- 页面 4: 反馈管理 -->
+        <!-- =========================================== -->
+        <div id="page-feedback" class="page-content">
+          <!-- 工具栏 -->
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-5">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <select id="feedback-status-filter" class="px-4 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50"
+                        onchange="filterFeedbacks()">
+                  <option value="">全部状态</option>
+                  <option value="pending">待处理</option>
+                  <option value="resolved">已处理</option>
+                </select>
+              </div>
+              <div class="text-sm text-gray-500">
+                共 <span id="feedback-total-count" class="font-semibold text-gray-800">0</span> 条反馈
+              </div>
+            </div>
+          </div>
+
+          <!-- 反馈列表 -->
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <table class="data-table w-full">
+              <thead>
+                <tr class="bg-gray-50 border-b border-gray-200">
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">ID</th>
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">用户昵称</th>
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">反馈内容</th>
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">时间</th>
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">状态</th>
+                  <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">操作</th>
+                </tr>
+              </thead>
+              <tbody id="feedback-table-body">
+                <!-- 由 JS 动态渲染 -->
+              </tbody>
+            </table>
+            <div id="feedback-empty" class="hidden py-16 text-center text-gray-400">
+              <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3 text-gray-300"></i>
+              <p class="text-sm">暂无匹配的反馈数据</p>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 指令表单弹窗 -->
+  <!-- ============================================================ -->
+  <div id="prompt-modal" class="modal-overlay hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="modal-content-card bg-white rounded-2xl w-[640px] max-h-[90vh] flex flex-col shadow-2xl">
+      <!-- 弹窗头部 -->
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 id="prompt-modal-title" class="text-lg font-semibold text-gray-800">添加指令</h3>
+        <button onclick="closePromptModal()" class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <!-- 弹窗表单 -->
+      <div class="px-6 py-5 overflow-y-auto flex-1 space-y-4">
+        <!-- 封面图 + 效果图上传 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">图片管理</label>
+          <!-- 封面 -->
+          <div class="mb-3">
+            <p class="text-xs text-gray-500 mb-1.5">封面图（列表展示用，点击可裁剪编辑）</p>
+            <div class="flex items-start gap-3">
+              <div id="cover-preview" class="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden bg-gray-50 flex-shrink-0 cursor-pointer hover:border-brand transition-colors" onclick="document.getElementById('cover-input').click()">
+                <div id="cover-placeholder" class="text-center">
+                  <i data-lucide="image-plus" class="w-6 h-6 text-gray-300 mx-auto"></i>
+                  <p class="text-[10px] text-gray-400 mt-0.5">上传</p>
+                </div>
+                <img id="cover-img" class="w-full h-full object-cover hidden" alt="">
+              </div>
+              <div class="flex-1 pt-1 space-y-1">
+                <p class="text-xs text-gray-400">上传图片后可裁剪选区</p>
+                <button type="button" id="cover-crop-btn" class="hidden px-3 py-1.5 bg-brand/10 text-brand text-xs font-medium rounded-md hover:bg-brand/20 transition-colors" onclick="openCoverCropper()">
+                  <i data-lucide="crop" class="w-3 h-3 inline -mt-0.5"></i> 裁剪编辑
+                </button>
+              </div>
+            </div>
+            <input type="file" id="cover-input" class="hidden" accept="image/*" onchange="handleCoverUpload(this)">
+          </div>
+          <!-- 效果图 -->
+          <div>
+            <p class="text-xs text-gray-500 mb-1.5">效果图（详情页轮播展示，可多张）</p>
+            <div id="slides-preview" class="flex flex-wrap gap-2">
+              <div id="slides-add-btn" class="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 cursor-pointer hover:border-brand transition-colors" onclick="document.getElementById('slides-input').click()">
+                <div class="text-center">
+                  <i data-lucide="plus" class="w-5 h-5 text-gray-300 mx-auto"></i>
+                  <p class="text-[10px] text-gray-400 mt-0.5">添加</p>
+                </div>
+              </div>
+            </div>
+            <input type="file" id="slides-input" class="hidden" accept="image/*" multiple onchange="handleSlidesUpload(this)">
+          </div>
+        </div>
+
+        <!-- 标题 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">指令标题 <span class="text-red-400">*</span></label>
+          <input type="text" id="prompt-form-title"
+                 class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm"
+                 placeholder="请输入指令标题">
+        </div>
+        <!-- 分类 + 消耗积分 -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">分类 <span class="text-red-400">*</span></label>
+            <select id="prompt-form-category"
+                    class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-white">
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">消耗积分 <span class="text-red-400">*</span></label>
+            <input type="number" id="prompt-form-cost" min="0" value="1"
+                   class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm"
+                   placeholder="0">
+          </div>
+        </div>
+        <!-- 指令文本 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">指令文本 <span class="text-red-400">*</span></label>
+          <textarea id="prompt-form-prompt" rows="5"
+                    class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm resize-none"
+                    placeholder="请输入完整的 AI 写真指令内容"></textarea>
+        </div>
+        <!-- 使用小贴士 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">使用小贴士</label>
+          <textarea id="prompt-form-tip" rows="2"
+                    class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm resize-none"
+                    placeholder="留空则显示默认小贴士"></textarea>
+          <p class="text-xs text-gray-400 mt-1">留空时用户端显示默认："生成效果不理想时，不妨多生成几次，择优而取。"</p>
+        </div>
+        <!-- 上传日期 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">上传日期</label>
+          <input type="date" id="prompt-form-date"
+                 class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm">
+        </div>
+        <!-- 标签 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">标签</label>
+          <input type="text" id="prompt-form-tags"
+                 class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm"
+                 placeholder="多个标签用逗号分隔，如：热门,时尚,写真"
+                 oninput="updateTagChips()">
+          <p class="text-xs text-gray-400 mt-1">多个标签以英文逗号分隔</p>
+          <!-- 常用标签 -->
+          <div id="common-tags-area" class="mt-2.5">
+            <p class="text-xs font-medium text-gray-500 mb-1.5">常用标签（点击添加）：</p>
+            <div id="common-tags-list" class="flex flex-wrap gap-1.5">
+              <!-- 由 JS 动态渲染 -->
+            </div>
+            <!-- 新增常用标签 -->
+            <div class="flex items-center gap-2 mt-2">
+              <input type="text" id="new-common-tag-input"
+                     class="flex-1 px-3 py-1.5 border border-gray-200 rounded-md text-xs"
+                     placeholder="添加新标签"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();addCommonTag();}">
+              <button onclick="addCommonTag()"
+                      class="px-2.5 py-1.5 bg-gray-100 text-gray-600 rounded-md text-xs font-medium hover:bg-gray-200">
+                添加
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 弹窗底部按钮 -->
+      <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3">
+        <button onclick="closePromptModal()"
+                class="px-5 py-2.5 border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50">
+          取消
+        </button>
+        <button onclick="savePrompt()"
+                class="px-5 py-2.5 bg-brand text-white rounded-lg text-sm font-medium hover:bg-brand-dark">
+          保存
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 封面裁剪弹窗 -->
+  <!-- ============================================================ -->
+  <div id="cover-crop-modal" class="modal-overlay hidden fixed inset-0 bg-black/60 flex items-center justify-center z-[60]">
+    <div class="bg-white rounded-2xl w-[520px] max-h-[90vh] flex flex-col shadow-2xl">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-800">裁剪封面</h3>
+        <button onclick="closeCoverCropper()" class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="px-6 py-5 overflow-y-auto flex-1">
+        <p class="text-xs text-gray-500 mb-3">拖动选框调整裁剪区域，拖动选框边角可缩放</p>
+        <div id="crop-container" class="relative mx-auto bg-gray-100 rounded-lg overflow-hidden" style="width:360px; height:360px; cursor:crosshair;">
+          <canvas id="crop-canvas" class="block"></canvas>
+          <!-- 裁剪框 -->
+          <div id="crop-box" class="absolute border-2 border-brand shadow-[0_0_0_9999px_rgba(0,0,0,0.4)]" style="cursor:move; left:40px; top:40px; width:280px; height:280px;">
+            <div class="absolute inset-0">
+              <!-- 三分线 -->
+              <div class="absolute left-1/3 top-0 bottom-0 w-px bg-white/40"></div>
+              <div class="absolute left-2/3 top-0 bottom-0 w-px bg-white/40"></div>
+              <div class="absolute top-1/3 left-0 right-0 h-px bg-white/40"></div>
+              <div class="absolute top-2/3 left-0 right-0 h-px bg-white/40"></div>
+            </div>
+            <!-- 四角拖拽手柄 -->
+            <div class="crop-handle nw" data-dir="nw"></div>
+            <div class="crop-handle ne" data-dir="ne"></div>
+            <div class="crop-handle sw" data-dir="sw"></div>
+            <div class="crop-handle se" data-dir="se"></div>
+            <!-- 四边中点拖拽手柄 -->
+            <div class="crop-handle-edge n" data-dir="n"></div>
+            <div class="crop-handle-edge s" data-dir="s"></div>
+            <div class="crop-handle-edge e" data-dir="e"></div>
+            <div class="crop-handle-edge w" data-dir="w"></div>
+          </div>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3">
+        <button onclick="closeCoverCropper()" class="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">
+          取消
+        </button>
+        <button onclick="applyCoverCrop()" class="px-5 py-2 bg-brand text-white rounded-lg text-sm font-medium hover:bg-brand-dark">
+          确认裁剪
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 分类管理弹窗 -->
+  <!-- ============================================================ -->
+  <div id="category-modal" class="modal-overlay hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="modal-content-card bg-white rounded-2xl w-[460px] max-h-[80vh] flex flex-col shadow-2xl">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-800">管理分类</h3>
+        <button onclick="closeCategoryManager()" class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="px-6 py-5 overflow-y-auto flex-1">
+        <div id="category-list" class="space-y-2">
+          <!-- 由 JS 动态渲染 -->
+        </div>
+        <!-- 新增分类 -->
+        <div class="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100">
+          <input type="text" id="new-category-input"
+                 class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                 placeholder="输入新分类名称"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();addCategory();}">
+          <button onclick="addCategory()"
+                  class="px-4 py-2 bg-brand text-white rounded-lg text-sm font-medium hover:bg-brand-dark">
+            添加
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- Banner 编辑弹窗 -->
+  <!-- ============================================================ -->
+  <div id="banner-modal" class="modal-overlay hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="modal-content-card bg-white rounded-2xl w-[520px] max-h-[80vh] flex flex-col shadow-2xl">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 id="banner-modal-title" class="text-lg font-semibold text-gray-800">添加 Banner</h3>
+        <button onclick="closeBannerModal()" class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="px-6 py-5 overflow-y-auto flex-1 space-y-4">
+        <!-- Banner 图片上传 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Banner 图片 <span class="text-red-400">*</span></label>
+          <div class="banner-upload-area w-full h-40 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden bg-gray-50 cursor-pointer hover:border-brand transition-colors" onclick="document.getElementById('banner-image-input').click()">
+            <div id="banner-image-placeholder" class="text-center">
+              <i data-lucide="image-plus" class="w-10 h-10 text-gray-300 mx-auto"></i>
+              <p class="text-sm text-gray-400 mt-1">点击上传 Banner 图片（建议 750×360px）</p>
+            </div>
+            <img id="banner-image-preview" class="w-full h-full object-cover hidden" alt="">
+          </div>
+          <input type="file" id="banner-image-input" class="hidden" accept="image/*" onchange="handleBannerImageUpload(this)">
+        </div>
+        <!-- 标题 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">标题 <span class="text-red-400">*</span></label>
+          <input type="text" id="banner-form-title" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm" placeholder="Banner 主标题">
+        </div>
+        <!-- 副标题 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">副标题</label>
+          <input type="text" id="banner-form-subtitle" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm" placeholder="Banner 副标题描述">
+        </div>
+        <!-- 跳转类型 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">点击跳转 <span class="text-red-400">*</span></label>
+          <select id="banner-form-link-type" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-white" onchange="updateBannerLinkHint()">
+            <option value="none">不跳转</option>
+            <option value="prompt">指令详情（指定指令ID）</option>
+            <option value="vip">会员权益页面</option>
+            <option value="invite">邀请拉新活动</option>
+            <option value="credits">积分规则页面</option>
+            <option value="custom">自定义页面路径</option>
+          </select>
+          <p id="banner-link-hint" class="text-xs text-gray-400 mt-1"></p>
+        </div>
+        <!-- 跳转参数 -->
+        <div id="banner-link-param-wrap">
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">跳转参数</label>
+          <input type="text" id="banner-form-link-param" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm" placeholder="如指令ID或其他参数">
+        </div>
+        <!-- 渐变样式 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">背景渐变色</label>
+          <div class="flex gap-2">
+            <div class="flex items-center gap-1.5">
+              <input type="color" id="banner-form-gradient-start" value="#FF6B9D" class="w-8 h-8 rounded border border-gray-200 cursor-pointer">
+              <span class="text-xs text-gray-400">起始色</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <input type="color" id="banner-form-gradient-end" value="#C4B5FD" class="w-8 h-8 rounded border border-gray-200 cursor-pointer">
+              <span class="text-xs text-gray-400">结束色</span>
+            </div>
+          </div>
+        </div>
+        <!-- 排序号 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">排序号</label>
+          <input type="number" id="banner-form-sort" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm" value="0" min="0" placeholder="数字越小越靠前">
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3">
+        <button onclick="closeBannerModal()" class="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">取消</button>
+        <button onclick="saveBanner()" class="px-5 py-2 bg-brand text-white rounded-lg text-sm font-medium hover:bg-brand-dark">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 确认弹窗（删除确认等） -->
+  <!-- ============================================================ -->
+  <div id="confirm-modal" class="modal-overlay hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="modal-content-card bg-white rounded-2xl w-[420px] shadow-2xl">
+      <div class="px-6 py-5 text-center">
+        <div class="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i data-lucide="alert-triangle" class="w-6 h-6 text-red-500"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-gray-800 mb-2" id="confirm-title">确认操作</h3>
+        <p class="text-sm text-gray-500" id="confirm-message">确定要执行此操作吗？此操作不可撤销。</p>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3">
+        <button onclick="closeConfirmModal()"
+                class="px-5 py-2.5 border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50">
+          取消
+        </button>
+        <button id="confirm-action-btn" onclick="executeConfirm()"
+                class="px-5 py-2.5 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600">
+          确认删除
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 积分调整弹窗 -->
+  <!-- ============================================================ -->
+  <div id="credits-modal" class="modal-overlay hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="modal-content-card bg-white rounded-2xl w-[420px] shadow-2xl">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-800">调整积分</h3>
+        <button onclick="closeCreditsModal()" class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="px-6 py-5">
+        <p class="text-sm text-gray-500 mb-4">
+          用户：<span id="credits-user-name" class="font-semibold text-gray-800"></span>
+          &nbsp;&nbsp;|&nbsp;&nbsp;当前积分：<span id="credits-current" class="font-semibold text-brand"></span>
+        </p>
+        <div class="flex items-center gap-3 mb-4">
+          <select id="credits-action" class="px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white">
+            <option value="add">增加积分</option>
+            <option value="subtract">扣减积分</option>
+          </select>
+          <input type="number" id="credits-amount" min="1" value="1"
+                 class="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg text-sm"
+                 placeholder="输入数量">
+          <span class="text-sm text-gray-400">积分</span>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">调整原因</label>
+          <input type="text" id="credits-reason"
+                 class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm"
+                 placeholder="如：活动赠送、系统补偿等">
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3">
+        <button onclick="closeCreditsModal()"
+                class="px-5 py-2.5 border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50">
+          取消
+        </button>
+        <button onclick="applyCreditsChange()"
+                class="px-5 py-2.5 bg-brand text-white rounded-lg text-sm font-medium hover:bg-brand-dark">
+          确认调整
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 积分明细弹窗 -->
+  <!-- ============================================================ -->
+  <div id="credits-detail-modal" class="modal-overlay hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="modal-content-card bg-white rounded-2xl w-[520px] max-h-[80vh] flex flex-col shadow-2xl">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-800">积分明细</h3>
+        <button onclick="closeCreditsDetailModal()" class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="px-6 py-5 overflow-y-auto flex-1">
+        <p class="text-sm text-gray-500 mb-4">
+          用户：<span id="credits-detail-name" class="font-semibold text-gray-800"></span>
+          &nbsp;&nbsp;|&nbsp;&nbsp;当前余额：<span id="credits-detail-balance" class="font-semibold text-brand"></span>
+        </p>
+        <div id="credits-detail-list" class="space-y-3">
+          <!-- 由 JS 动态渲染 -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 反馈详情弹窗 -->
+  <!-- ============================================================ -->
+  <div id="feedback-detail-modal" class="modal-overlay hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="modal-content-card bg-white rounded-2xl w-[520px] max-h-[80vh] flex flex-col shadow-2xl">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-800">反馈详情</h3>
+        <button onclick="closeFeedbackDetailModal()" class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="px-6 py-5 overflow-y-auto flex-1">
+        <div id="feedback-detail-content" class="space-y-4">
+          <!-- 由 JS 动态渲染 -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- Toast 容器 -->
+  <!-- ============================================================ -->
+  <div id="toast-container" class="fixed top-5 right-5 z-[100] space-y-3">
+    <!-- 由 JS 动态插入 -->
+  </div>
+
+
+  <script>
+    // ==========================================
+    // API 基础配置
+    // ==========================================
+    const API_BASE = 'http://localhost:3000/api';
+
+    // ==========================================
+    // 全局状态
+    // ==========================================
+    let currentPage = 'dashboard';
+    let editingPromptId = null;
+    let editingUserId = null;
+    let allPrompts = [];       // 从 API 获取的指令列表缓存
+    let allUsers = [];         // 从 API 获取的用户列表缓存
+    let allFeedbacks = [];     // 从 API 获取的反馈列表缓存
+    let promptCategories = []; // 从指令列表中提取的分类
+    let commonTags = ['热门', '时尚', '写真', '古风', '港风', '复古', '水彩', '治愈', '校园', '赛博朋克', '创意', '胶片'];
+
+    // Banner 和操作记录保持本地（后端暂无对应 API）
+    let banners = [
+      { id: 1, title: '会员专属权益', subtitle: '解锁更多精品指令与专属特权', image: '', linkType: 'vip', linkParam: '', gradientStart: '#FF6B9D', gradientEnd: '#C4B5FD', sort: 0, status: 'active' },
+      { id: 2, title: '邀请好友赚积分', subtitle: '每成功邀请一位好友即可获得 +1 积分', image: '', linkType: 'invite', linkParam: '', gradientStart: '#FDA4AF', gradientEnd: '#86E3CE', sort: 1, status: 'active' },
+      { id: 3, title: '积分获取与使用规则', subtitle: '签到、看广告、分享都能赚积分', image: '', linkType: 'credits', linkParam: '', gradientStart: '#C4B5FD', gradientEnd: '#93C5FD', sort: 2, status: 'active' }
+    ];
+    let recentLogs = [];
+    let nextBannerId = 4;
+    let nextLogId = 1;
+
+    // ==========================================
+    // 页面标题映射
+    // ==========================================
+    const PAGE_TITLES = {
+      dashboard: '数据看板',
+      prompts: '指令管理',
+      banners: 'Banners',
+      users: '用户管理',
+      feedback: '反馈管理'
+    };
+
+    // ==========================================
+    // 工具函数：带 Token 的 fetch 封装
+    // ==========================================
+    function getToken() {
+      return localStorage.getItem('admin_token') || '';
+    }
+
+    function authHeaders() {
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + getToken()
+      };
+    }
+
+    async function apiGet(url) {
+      const res = await fetch(API_BASE + url, { headers: authHeaders() });
+      return res.json();
+    }
+
+    async function apiPost(url, body) {
+      const res = await fetch(API_BASE + url, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(body)
+      });
+      return res.json();
+    }
+
+    async function apiPut(url, body) {
+      const res = await fetch(API_BASE + url, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify(body)
+      });
+      return res.json();
+    }
+
+    async function apiDelete(url) {
+      const res = await fetch(API_BASE + url, {
+        method: 'DELETE',
+        headers: authHeaders()
+      });
+      return res.json();
+    }
+
+    // ==========================================
+    // 登录 / 鉴权
+    // ==========================================
+    function checkAuth() {
+      const token = getToken();
+      if (token) {
+        document.getElementById('login-page').classList.add('hidden');
+        initApp();
+      } else {
+        document.getElementById('login-page').classList.remove('hidden');
+        lucide.createIcons();
+      }
+    }
+
+    async function handleLogin() {
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value.trim();
+      const errorEl = document.getElementById('login-error');
+      const btn = document.getElementById('login-btn');
+
+      if (!username || !password) {
+        errorEl.textContent = '请输入用户名和密码';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = '登录中...';
+      errorEl.classList.add('hidden');
+
+      try {
+        const res = await fetch(API_BASE + '/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+
+        if (data.code === 0 || data.code === 200 || data.token) {
+          const token = data.data ? data.data.token : data.token;
+          localStorage.setItem('admin_token', token);
+          document.getElementById('login-page').classList.add('hidden');
+          showToast('登录成功', 'success');
+          initApp();
+        } else {
+          errorEl.textContent = data.msg || data.message || '登录失败，请检查账号密码';
+          errorEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        errorEl.textContent = '网络错误，请检查后端服务是否启动';
+        errorEl.classList.remove('hidden');
+      }
+
+      btn.disabled = false;
+      btn.textContent = '登 录';
+    }
+
+    function handleLogout() {
+      showConfirm('退出登录', '确定要退出登录吗？退出后需要重新登录。', function() {
+        localStorage.removeItem('admin_token');
+        location.reload();
+      });
+    }
+
+    // ==========================================
+    // 初始化
+    // ==========================================
+    async function initApp() {
+      // 渲染 Dashboard
+      renderDashboard();
+      // 渲染各页面数据
+      renderPrompts();
+      renderUsers();
+      renderFeedbacks();
+      renderBanners();
+      // 初始化分类和标签
+      refreshCategorySelects();
+      renderCommonTags();
+      // 初始化 Lucide 图标
+      lucide.createIcons();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      checkAuth();
+    });
+
+    // ==========================================
+    // 页面切换
+    // ==========================================
+    function switchPage(page) {
+      currentPage = page;
+
+      // 更新导航高亮
+      document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.page === page) {
+          item.classList.add('active');
+        }
+      });
+
+      // 切换页面内容
+      document.querySelectorAll('.page-content').forEach(el => el.classList.remove('active'));
+      const targetPage = document.getElementById('page-' + page);
+      if (targetPage) targetPage.classList.add('active');
+
+      // 更新标题
+      document.getElementById('page-title').textContent = PAGE_TITLES[page] || '';
+
+      // 重新初始化图标
+      lucide.createIcons();
+
+      // 刷新对应页面数据
+      if (page === 'dashboard') renderDashboard();
+      else if (page === 'prompts') renderPrompts();
+      else if (page === 'users') renderUsers();
+      else if (page === 'feedback') renderFeedbacks();
+      else if (page === 'banners') renderBanners();
+    }
+
+    // ==========================================
+    // Toast 提示
+    // ==========================================
+    function showToast(message, type) {
+      type = type || 'success';
+      const container = document.getElementById('toast-container');
+
+      const iconMap = {
+        success: { icon: 'check-circle', color: 'text-green-500', bg: 'bg-green-50', border: 'border-green-200' },
+        error: { icon: 'x-circle', color: 'text-red-500', bg: 'bg-red-50', border: 'border-red-200' },
+        info: { icon: 'info', color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-200' },
+        warning: { icon: 'alert-triangle', color: 'text-yellow-500', bg: 'bg-yellow-50', border: 'border-yellow-200' }
+      };
+
+      const config = iconMap[type] || iconMap.success;
+
+      const toastEl = document.createElement('div');
+      toastEl.className = 'toast flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border ' + config.bg + ' ' + config.border + ' min-w-[280px]';
+      toastEl.innerHTML = '<i data-lucide="' + config.icon + '" class="w-5 h-5 ' + config.color + ' flex-shrink-0"></i><span class="text-sm text-gray-700 font-medium">' + message + '</span>';
+
+      container.appendChild(toastEl);
+      lucide.createIcons({ nodes: [toastEl] });
+
+      setTimeout(() => {
+        toastEl.classList.add('hiding');
+        setTimeout(() => {
+          if (toastEl.parentNode) toastEl.parentNode.removeChild(toastEl);
+        }, 300);
+      }, 2500);
+    }
+
+    // ==========================================
+    // 确认弹窗
+    // ==========================================
+    let confirmCallback = null;
+
+    function showConfirm(title, message, callback) {
+      document.getElementById('confirm-title').textContent = title;
+      document.getElementById('confirm-message').textContent = message;
+      confirmCallback = callback;
+      document.getElementById('confirm-modal').classList.remove('hidden');
+    }
+
+    function closeConfirmModal() {
+      document.getElementById('confirm-modal').classList.add('hidden');
+      confirmCallback = null;
+    }
+
+    function executeConfirm() {
+      if (confirmCallback) confirmCallback();
+      closeConfirmModal();
+    }
+
+    // ==========================================
+    // Dashboard 渲染（从 API 获取统计数据）
+    // ==========================================
+    async function renderDashboard() {
+      try {
+        const res = await apiGet('/admin/stats');
+        const stats = res.data || res;
+
+        animateNumber('stat-total-users', stats.totalUsers || 0);
+        animateNumber('stat-today-new', stats.todayUsers || 0);
+        animateNumber('stat-today-copies', stats.todayCopies || 0);
+        animateNumber('stat-today-ads', stats.totalAdUnlocks || 0);
+      } catch (err) {
+        console.error('获取统计数据失败:', err);
+      }
+
+      // 热门指令 TOP 5（从缓存的 allPrompts 取）
+      renderHotPrompts();
+
+      // 最近操作记录
+      renderRecentLogs();
+    }
+
+    // 数字递增动画
+    function animateNumber(elementId, target) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      let current = 0;
+      const step = Math.max(1, Math.ceil(target / 30));
+      const timer = setInterval(() => {
+        current += step;
+        if (current >= target) {
+          current = target;
+          clearInterval(timer);
+        }
+        el.textContent = current;
+      }, 30);
+    }
+
+    // 渲染热门指令 TOP 5
+    function renderHotPrompts() {
+      const container = document.getElementById('hot-prompts-list');
+      if (!container) return;
+
+      const top5 = [...allPrompts]
+        .sort((a, b) => (b.copy_count || 0) - (a.copy_count || 0))
+        .slice(0, 5);
+
+      if (top5.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">暂无指令数据</p>';
+        return;
+      }
+
+      container.innerHTML = top5.map((prompt, index) => {
+        const rankColors = ['bg-brand text-white', 'bg-pink-100 text-brand', 'bg-pink-50 text-brand-dark', 'bg-gray-100 text-gray-500', 'bg-gray-100 text-gray-500'];
+        const rankColor = rankColors[index] || 'bg-gray-100 text-gray-500';
+        return '<div class="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">' +
+          '<span class="w-7 h-7 ' + rankColor + ' rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0">' + (index + 1) + '</span>' +
+          '<div class="flex-1 min-w-0">' +
+          '<p class="text-sm font-medium text-gray-800 truncate">' + (prompt.title || '') + '</p>' +
+          '<p class="text-xs text-gray-400">' + (prompt.category || '') + '</p>' +
+          '</div>' +
+          '<span class="text-sm font-semibold text-gray-600">' + formatCopies(prompt.copy_count || 0) + '</span>' +
+          '</div>';
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    // 渲染最近操作记录
+    function renderRecentLogs() {
+      const container = document.getElementById('recent-logs');
+      const logs = recentLogs.slice(0, 6);
+
+      if (logs.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-400 text-center py-8">暂无操作记录</p>';
+        return;
+      }
+
+      const typeColors = {
+        add: 'bg-green-500',
+        edit: 'bg-blue-500',
+        credit: 'bg-purple-500',
+        feedback: 'bg-yellow-500',
+        user: 'bg-brand',
+        delete: 'bg-red-500'
+      };
+
+      container.innerHTML = logs.map(log => {
+        const dotColor = typeColors[log.type] || 'bg-gray-400';
+        return '<div class="timeline-item">' +
+          '<div class="timeline-dot" style="border-color: transparent; background: ' + dotColor + ';"></div>' +
+          '<div class="flex items-center justify-between">' +
+          '<span class="text-sm text-gray-700">' + log.action + '</span>' +
+          '<span class="text-xs text-gray-400 flex-shrink-0 ml-4">' + log.time + '</span>' +
+          '</div></div>';
+      }).join('');
+    }
+
+    // 格式化复制量数字
+    function formatCopies(num) {
+      if (num >= 10000) return (num / 10000).toFixed(1) + 'w';
+      if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+      return String(num);
+    }
+
+    // 添加操作记录
+    function addLog(action, type) {
+      const now = new Date();
+      const timeStr = now.getFullYear() + '-' +
+        String(now.getMonth() + 1).padStart(2, '0') + '-' +
+        String(now.getDate()).padStart(2, '0') + ' ' +
+        String(now.getHours()).padStart(2, '0') + ':' +
+        String(now.getMinutes()).padStart(2, '0');
+
+      recentLogs.unshift({ id: nextLogId++, action: action, time: timeStr, type: type });
+      if (recentLogs.length > 20) recentLogs = recentLogs.slice(0, 20);
+    }
+
+    // ==========================================
+    // 指令管理（API 对接）
+    // ==========================================
+    async function renderPrompts() {
+      const tbody = document.getElementById('prompts-table-body');
+      const emptyEl = document.getElementById('prompts-empty');
+      if (!tbody) return;
+
+      // 显示加载状态
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-400">加载中...</td></tr>';
+      emptyEl.classList.add('hidden');
+
+      try {
+        const keyword = document.getElementById('prompt-search-input') ? document.getElementById('prompt-search-input').value.trim() : '';
+        const category = document.getElementById('prompt-category-filter') ? document.getElementById('prompt-category-filter').value : '';
+        const status = document.getElementById('prompt-status-filter') ? document.getElementById('prompt-status-filter').value : '';
+
+        const params = new URLSearchParams({ page: 1, pageSize: 200 });
+        if (keyword) params.set('keyword', keyword);
+        if (category) params.set('category', category);
+
+        const res = await apiGet('/admin/prompts?' + params.toString());
+        const data = res.data || res;
+        allPrompts = data.list || [];
+
+        // 从指令列表中提取所有分类
+        const catsSet = new Set();
+        allPrompts.forEach(p => { if (p.category) catsSet.add(p.category); });
+        promptCategories = Array.from(catsSet);
+        refreshCategorySelects();
+
+        // 前端筛选状态（后端不一定支持 status 筛选）
+        let filtered = allPrompts;
+        if (status) {
+          filtered = filtered.filter(p => String(p.status) === status);
+        }
+
+        if (filtered.length === 0) {
+          tbody.innerHTML = '';
+          emptyEl.classList.remove('hidden');
+          lucide.createIcons();
+          return;
+        }
+
+        emptyEl.classList.add('hidden');
+
+        tbody.innerHTML = filtered.map(p => {
+          // 解析 tags
+          let tagsArray = [];
+          try { tagsArray = p.tags ? JSON.parse(p.tags) : []; } catch(e) { tagsArray = p.tags ? p.tags.split(',').map(t => t.trim()) : []; }
+          if (!Array.isArray(tagsArray)) tagsArray = [];
+
+          const tagsHtml = tagsArray.slice(0, 3).map(tag =>
+            '<span class="inline-block px-2 py-0.5 bg-pink-50 text-brand text-xs rounded-md">' + tag + '</span>'
+          ).join(' ');
+
+          const isActive = String(p.status) === 'active' || String(p.status) === '1';
+          const statusHtml = isActive
+            ? '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium status-active"><i data-lucide="check-circle-2" class="w-3 h-3"></i>已上架</span>'
+            : '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium status-inactive"><i data-lucide="x-circle" class="w-3 h-3"></i>已下架</span>';
+
+          const isRecommended = p.is_recommended || p.isRecommended || false;
+          const coverHtml = p.cover
+            ? '<img src="' + p.cover + '" class="w-9 h-9 rounded-lg object-cover flex-shrink-0" alt="">'
+            : '<div class="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-light to-brand flex items-center justify-center flex-shrink-0"><i data-lucide="image" class="w-4 h-4 text-white"></i></div>';
+
+          return '<tr class="border-b border-gray-100">' +
+            '<td class="px-5 py-3.5 text-sm text-gray-500">#' + p.id + '</td>' +
+            '<td class="px-5 py-3.5"><div class="flex items-center gap-3">' +
+            coverHtml +
+            '<div><p class="text-sm font-medium text-gray-800">' + (p.title || '') + '</p>' +
+            '<p class="text-xs text-gray-400 mt-0.5 truncate max-w-[200px]">' + (p.content || '') + '</p></div></div></td>' +
+            '<td class="px-5 py-3.5"><span class="inline-block px-2.5 py-1 bg-gray-100 text-gray-600 text-xs rounded-md font-medium">' + (p.category || '') + '</span></td>' +
+            '<td class="px-5 py-3.5 text-sm font-semibold text-brand">' + (p.weight || 0) + '</td>' +
+            '<td class="px-5 py-3.5 text-sm text-gray-700">' + formatCopies(p.copy_count || 0) + '</td>' +
+            '<td class="px-5 py-3.5">' + statusHtml + '</td>' +
+            '<td class="px-5 py-3.5"><div class="flex flex-wrap gap-1">' + tagsHtml + '</div></td>' +
+            '<td class="px-5 py-3.5"><div class="flex items-center gap-2">' +
+            '<button onclick="toggleRecommend(' + p.id + ')" class="p-1.5 rounded-lg ' + (isRecommended ? 'text-brand hover:bg-pink-50' : 'text-gray-400 hover:text-brand hover:bg-pink-50') + '" title="' + (isRecommended ? '取消推荐' : '设为推荐') + '">' +
+            '<i data-lucide="star" class="w-4 h-4 ' + (isRecommended ? 'fill-current' : '') + '"></i></button>' +
+            '<button onclick="editPrompt(' + p.id + ')" class="p-1.5 text-gray-400 hover:text-brand hover:bg-pink-50 rounded-lg" title="编辑"><i data-lucide="pencil" class="w-4 h-4"></i></button>' +
+            '<button onclick="togglePromptStatus(' + p.id + ')" class="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg" title="' + (isActive ? '下架' : '上架') + '">' +
+            '<i data-lucide="' + (isActive ? 'eye-off' : 'eye') + '" class="w-4 h-4"></i></button>' +
+            '<button onclick="deletePrompt(' + p.id + ')" class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg" title="删除"><i data-lucide="trash-2" class="w-4 h-4"></i></button>' +
+            '</div></td></tr>';
+        }).join('');
+
+        lucide.createIcons();
+      } catch (err) {
+        console.error('获取指令列表失败:', err);
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-red-400">加载失败，请检查网络连接</td></tr>';
+      }
+    }
+
+    function filterPrompts() {
+      renderPrompts();
+    }
+
+    // 打开指令弹窗（新增）
+    function openPromptModal() {
+      editingPromptId = null;
+      document.getElementById('prompt-modal-title').textContent = '添加指令';
+      document.getElementById('prompt-form-title').value = '';
+      document.getElementById('prompt-form-category').value = promptCategories.length > 0 ? promptCategories[0] : '';
+      document.getElementById('prompt-form-cost').value = '1';
+      document.getElementById('prompt-form-prompt').value = '';
+      document.getElementById('prompt-form-date').value = new Date().toISOString().split('T')[0];
+      document.getElementById('prompt-form-tags').value = '';
+      document.getElementById('prompt-form-tip').value = '';
+      currentCover = '';
+      currentSlides = [];
+      resetImagePreviews();
+      renderCommonTags();
+      document.getElementById('prompt-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    // 打开指令弹窗（编辑）—— 从 allPrompts 缓存中取数据
+    function editPrompt(id) {
+      editingPromptId = id;
+      const prompt = allPrompts.find(p => p.id === id);
+      if (!prompt) return;
+
+      document.getElementById('prompt-modal-title').textContent = '编辑指令';
+      document.getElementById('prompt-form-title').value = prompt.title || '';
+      document.getElementById('prompt-form-category').value = prompt.category || '';
+      document.getElementById('prompt-form-cost').value = String(prompt.weight || 0);
+      document.getElementById('prompt-form-prompt').value = prompt.content || '';
+      document.getElementById('prompt-form-date').value = (prompt.created_at || '').split('T')[0] || (prompt.updated_at || '').split('T')[0] || '';
+      document.getElementById('prompt-form-tip').value = prompt.description || '';
+
+      // 解析 tags
+      let tagsStr = '';
+      try {
+        const tags = prompt.tags ? JSON.parse(prompt.tags) : [];
+        tagsStr = Array.isArray(tags) ? tags.join(',') : '';
+      } catch(e) {
+        tagsStr = prompt.tags || '';
+      }
+      document.getElementById('prompt-form-tags').value = tagsStr;
+
+      // 图片
+      currentCover = prompt.cover || '';
+      let slidesArr = [];
+      try {
+        slidesArr = prompt.images ? JSON.parse(prompt.images) : [];
+        if (!Array.isArray(slidesArr)) slidesArr = [];
+      } catch(e) {
+        slidesArr = [];
+      }
+      currentSlides = slidesArr;
+      renderImagePreviews();
+
+      if (currentCover) {
+        document.getElementById('cover-crop-btn').classList.remove('hidden');
+      }
+
+      renderCommonTags();
+      document.getElementById('prompt-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closePromptModal() {
+      document.getElementById('prompt-modal').classList.add('hidden');
+      editingPromptId = null;
+      currentCover = '';
+      currentSlides = [];
+    }
+
+    // 保存指令（新增 / 编辑）—— 调用 API
+    async function savePrompt() {
+      const title = document.getElementById('prompt-form-title').value.trim();
+      const category = document.getElementById('prompt-form-category').value;
+      const weight = parseInt(document.getElementById('prompt-form-cost').value) || 0;
+      const content = document.getElementById('prompt-form-prompt').value.trim();
+      const tags = document.getElementById('prompt-form-tags').value.trim();
+      const description = document.getElementById('prompt-form-tip').value.trim();
+
+      if (!title) { showToast('请输入指令标题', 'warning'); return; }
+      if (!content) { showToast('请输入指令文本', 'warning'); return; }
+
+      const body = {
+        title: title,
+        category: category,
+        content: content,
+        description: description,
+        tags: tags,
+        cover: currentCover,
+        images: JSON.stringify(currentSlides),
+        weight: weight,
+        is_top: 0,
+        is_recommended: 0
+      };
+
+      try {
+        if (editingPromptId) {
+          // 编辑模式
+          await apiPut('/admin/prompts/' + editingPromptId, body);
+          addLog('编辑了指令「' + title + '」', 'edit');
+          showToast('指令已更新', 'success');
+        } else {
+          // 新增模式
+          await apiPost('/admin/prompts', body);
+          addLog('添加了指令「' + title + '」', 'add');
+          showToast('指令添加成功', 'success');
+        }
+        closePromptModal();
+        renderPrompts();
+      } catch (err) {
+        console.error('保存指令失败:', err);
+        showToast('保存失败，请检查网络连接', 'error');
+      }
+    }
+
+    // 切换指令状态（上架/下架）—— 调用 API
+    async function togglePromptStatus(id) {
+      const prompt = allPrompts.find(p => p.id === id);
+      if (!prompt) return;
+
+      const newStatus = (String(prompt.status) === 'active' || String(prompt.status) === '1') ? 0 : 1;
+      const statusText = newStatus === 1 ? '上架' : '下架';
+
+      try {
+        await apiPut('/admin/prompts/' + id, { status: newStatus });
+        addLog('将「' + (prompt.title || '') + '」状态设为' + statusText, 'edit');
+        showToast('已' + statusText + '「' + (prompt.title || '') + '」', 'success');
+        renderPrompts();
+      } catch (err) {
+        showToast('操作失败', 'error');
+      }
+    }
+
+    // 切换推荐状态
+    async function toggleRecommend(id) {
+      const prompt = allPrompts.find(p => p.id === id);
+      if (!prompt) return;
+
+      const isRecommended = prompt.is_recommended || prompt.isRecommended || false;
+      const newVal = isRecommended ? 0 : 1;
+
+      try {
+        await apiPut('/admin/prompts/' + id, { is_recommended: newVal });
+        addLog(newVal ? '推荐置顶了「' + (prompt.title || '') + '」' : '取消了「' + (prompt.title || '') + '」的推荐', 'edit');
+        showToast(newVal ? '已推荐置顶' : '已取消推荐', 'success');
+        renderPrompts();
+      } catch (err) {
+        showToast('操作失败', 'error');
+      }
+    }
+
+    // 删除指令 —— 调用 API
+    function deletePrompt(id) {
+      const prompt = allPrompts.find(p => p.id === id);
+      if (!prompt) return;
+
+      showConfirm('删除指令', '确定要删除指令「' + (prompt.title || '') + '」吗？删除后不可恢复。', async function() {
+        try {
+          await apiDelete('/admin/prompts/' + id);
+          addLog('删除了指令「' + (prompt.title || '') + '」', 'delete');
+          showToast('指令已删除', 'success');
+          renderPrompts();
+        } catch (err) {
+          showToast('删除失败', 'error');
+        }
+      });
+    }
+
+    // ==========================================
+    // 用户管理（API 对接）
+    // ==========================================
+    async function renderUsers() {
+      const tbody = document.getElementById('users-table-body');
+      const emptyEl = document.getElementById('users-empty');
+      if (!tbody) return;
+
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-gray-400">加载中...</td></tr>';
+      emptyEl.classList.add('hidden');
+
+      try {
+        const keyword = document.getElementById('user-search-input') ? document.getElementById('user-search-input').value.trim() : '';
+        const params = new URLSearchParams({ page: 1, pageSize: 200 });
+        if (keyword) params.set('keyword', keyword);
+
+        const res = await apiGet('/admin/users?' + params.toString());
+        const data = res.data || res;
+        allUsers = data.list || [];
+        const total = data.total || allUsers.length;
+
+        document.getElementById('users-total-count').textContent = total;
+
+        if (allUsers.length === 0) {
+          tbody.innerHTML = '';
+          emptyEl.classList.remove('hidden');
+          lucide.createIcons();
+          return;
+        }
+
+        emptyEl.classList.add('hidden');
+
+        tbody.innerHTML = allUsers.map(u => {
+          const colors = ['bg-brand', 'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-teal-500', 'bg-indigo-500', 'bg-pink-500'];
+          const avatarColor = colors[u.id % colors.length];
+          const nickName = u.nickName || u.nickname || u.name || ('用户' + u.id);
+          const credits = u.credits || u.balance || 0;
+          const registeredAt = (u.created_at || u.registeredAt || '').split('T')[0] || '';
+
+          return '<tr class="border-b border-gray-100">' +
+            '<td class="px-5 py-3.5 text-sm text-gray-500">#' + u.id + '</td>' +
+            '<td class="px-5 py-3.5"><div class="flex items-center gap-3">' +
+            '<div class="w-8 h-8 ' + avatarColor + ' rounded-full flex items-center justify-center flex-shrink-0">' +
+            '<span class="text-white text-xs font-bold">' + nickName.charAt(0) + '</span></div>' +
+            '<span class="text-sm font-medium text-gray-800">' + nickName + '</span></div></td>' +
+            '<td class="px-5 py-3.5"><span class="text-sm font-semibold ' + (credits > 0 ? 'text-brand' : 'text-gray-400') + '">' + credits + '</span>' +
+            '<span class="text-xs text-gray-400 ml-1">积分</span></td>' +
+            '<td class="px-5 py-3.5 text-sm text-gray-500">' + registeredAt + '</td>' +
+            '<td class="px-5 py-3.5"><div class="flex items-center gap-2">' +
+            '<button onclick="viewCreditsDetail(' + u.id + ')" class="p-1.5 text-gray-400 hover:text-brand hover:bg-pink-50 rounded-lg" title="积分明细"><i data-lucide="receipt" class="w-4 h-4"></i></button>' +
+            '<button onclick="openCreditsModal(' + u.id + ')" class="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg" title="调整积分"><i data-lucide="coins" class="w-4 h-4"></i></button>' +
+            '</div></td></tr>';
+        }).join('');
+
+        lucide.createIcons();
+      } catch (err) {
+        console.error('获取用户列表失败:', err);
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-red-400">加载失败</td></tr>';
+      }
+    }
+
+    function filterUsers() {
+      renderUsers();
+    }
+
+    // 查看用户积分明细（后端暂无此 API，显示提示）
+    function viewCreditsDetail(userId) {
+      const user = allUsers.find(u => u.id === userId);
+      if (!user) return;
+
+      const nickName = user.nickName || user.nickname || user.name || ('用户' + user.id);
+      const credits = user.credits || user.balance || 0;
+
+      document.getElementById('credits-detail-name').textContent = nickName;
+      document.getElementById('credits-detail-balance').textContent = credits + ' 积分';
+      document.getElementById('credits-detail-list').innerHTML = '<p class="text-sm text-gray-400 text-center py-8">暂无积分记录（后端暂未提供此接口）</p>';
+      document.getElementById('credits-detail-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeCreditsDetailModal() {
+      document.getElementById('credits-detail-modal').classList.add('hidden');
+    }
+
+    function openCreditsModal(userId) {
+      const user = allUsers.find(u => u.id === userId);
+      if (!user) return;
+
+      editingUserId = userId;
+      const nickName = user.nickName || user.nickname || user.name || ('用户' + user.id);
+      document.getElementById('credits-user-name').textContent = nickName;
+      document.getElementById('credits-current').textContent = user.credits || user.balance || 0;
+      document.getElementById('credits-action').value = 'add';
+      document.getElementById('credits-amount').value = '1';
+      document.getElementById('credits-reason').value = '';
+      document.getElementById('credits-modal').classList.remove('hidden');
+    }
+
+    function closeCreditsModal() {
+      document.getElementById('credits-modal').classList.add('hidden');
+      editingUserId = null;
+    }
+
+    // 积分调整（后端暂无此 API，前端本地更新缓存）
+    function applyCreditsChange() {
+      if (!editingUserId) return;
+      showToast('积分调整功能需要后端支持', 'warning');
+      closeCreditsModal();
+    }
+
+    // ==========================================
+    // 反馈管理（API 对接）
+    // ==========================================
+    async function renderFeedbacks() {
+      const tbody = document.getElementById('feedback-table-body');
+      const emptyEl = document.getElementById('feedback-empty');
+      if (!tbody) return;
+
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-400">加载中...</td></tr>';
+      emptyEl.classList.add('hidden');
+
+      try {
+        const res = await apiGet('/admin/feedback');
+        const data = res.data || res;
+        allFeedbacks = Array.isArray(data) ? data : (data.list || []);
+        const statusFilter = document.getElementById('feedback-status-filter') ? document.getElementById('feedback-status-filter').value : '';
+
+        let filtered = allFeedbacks;
+        if (statusFilter) {
+          filtered = filtered.filter(f => String(f.status) === statusFilter);
+        }
+
+        document.getElementById('feedback-total-count').textContent = filtered.length;
+
+        if (filtered.length === 0) {
+          tbody.innerHTML = '';
+          emptyEl.classList.remove('hidden');
+          lucide.createIcons();
+          return;
+        }
+
+        emptyEl.classList.add('hidden');
+
+        tbody.innerHTML = filtered.map((f, idx) => {
+          const isResolved = String(f.status) === 'resolved';
+          const statusHtml = isResolved
+            ? '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium status-resolved"><i data-lucide="check-circle-2" class="w-3 h-3"></i>已处理</span>'
+            : '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium status-pending"><i data-lucide="clock" class="w-3 h-3"></i>待处理</span>';
+
+          const colors = ['bg-brand', 'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500'];
+          const avatarColor = colors[(f.user_id || f.userId || idx) % colors.length];
+          const nickName = f.nickName || f.nickname || f.user_name || ('用户' + (f.user_id || f.userId || idx));
+          const createdAt = f.created_at || f.createdAt || '';
+
+          return '<tr class="border-b border-gray-100">' +
+            '<td class="px-5 py-3.5 text-sm text-gray-500">#' + (f.id || idx + 1) + '</td>' +
+            '<td class="px-5 py-3.5"><div class="flex items-center gap-2.5">' +
+            '<div class="w-7 h-7 ' + avatarColor + ' rounded-full flex items-center justify-center flex-shrink-0">' +
+            '<span class="text-white text-xs font-bold">' + nickName.charAt(0) + '</span></div>' +
+            '<span class="text-sm font-medium text-gray-800">' + nickName + '</span></div></td>' +
+            '<td class="px-5 py-3.5"><p class="text-sm text-gray-600 truncate max-w-[300px]">' + (f.content || '') + '</p></td>' +
+            '<td class="px-5 py-3.5 text-sm text-gray-500">' + createdAt + '</td>' +
+            '<td class="px-5 py-3.5">' + statusHtml + '</td>' +
+            '<td class="px-5 py-3.5"><div class="flex items-center gap-2">' +
+            '<button onclick="viewFeedbackDetail(' + idx + ')" class="p-1.5 text-gray-400 hover:text-brand hover:bg-pink-50 rounded-lg" title="查看详情"><i data-lucide="eye" class="w-4 h-4"></i></button>' +
+            '</div></td></tr>';
+        }).join('');
+
+        lucide.createIcons();
+      } catch (err) {
+        console.error('获取反馈列表失败:', err);
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-red-400">加载失败</td></tr>';
+      }
+    }
+
+    function filterFeedbacks() {
+      renderFeedbacks();
+    }
+
+    function viewFeedbackDetail(idx) {
+      const f = allFeedbacks[idx];
+      if (!f) return;
+
+      const isResolved = String(f.status) === 'resolved';
+      const statusHtml = isResolved
+        ? '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium status-resolved"><i data-lucide="check-circle-2" class="w-3 h-3"></i>已处理</span>'
+        : '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium status-pending"><i data-lucide="clock" class="w-3 h-3"></i>待处理</span>';
+
+      const nickName = f.nickName || f.nickname || f.user_name || '匿名用户';
+      const colors = ['bg-brand', 'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500'];
+      const avatarColor = colors[(f.user_id || f.userId || idx) % colors.length];
+
+      document.getElementById('feedback-detail-content').innerHTML =
+        '<div class="flex items-center gap-3 pb-4 border-b border-gray-100">' +
+        '<div class="w-10 h-10 ' + avatarColor + ' rounded-full flex items-center justify-center flex-shrink-0">' +
+        '<span class="text-white text-sm font-bold">' + nickName.charAt(0) + '</span></div>' +
+        '<div><p class="text-sm font-semibold text-gray-800">' + nickName + '</p>' +
+        '<p class="text-xs text-gray-400">提交于 ' + (f.created_at || f.createdAt || '') + '</p></div>' +
+        '<div class="ml-auto">' + statusHtml + '</div></div>' +
+        '<div class="pt-3"><h4 class="text-sm font-medium text-gray-500 mb-2">反馈内容</h4>' +
+        '<p class="text-sm text-gray-700 leading-relaxed">' + (f.content || '') + '</p></div>' +
+        '<div class="pt-4"><button onclick="closeFeedbackDetailModal()" class="px-4 py-2.5 border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50">关闭</button></div>';
+
+      document.getElementById('feedback-detail-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeFeedbackDetailModal() {
+      document.getElementById('feedback-detail-modal').classList.add('hidden');
+    }
+
+    // ==========================================
+    // 分类管理（本地管理，从指令数据中提取）
+    // ==========================================
+    function refreshCategorySelects() {
+      const cats = promptCategories;
+      const filterSel = document.getElementById('prompt-category-filter');
+      if (filterSel) {
+        const filterVal = filterSel.value;
+        filterSel.innerHTML = '<option value="">全部分类</option>' +
+          cats.map(c => '<option value="' + c + '">' + c + '</option>').join('');
+        filterSel.value = filterVal;
+      }
+      const formSel = document.getElementById('prompt-form-category');
+      if (formSel) {
+        const formVal = formSel.value;
+        formSel.innerHTML = cats.map(c => '<option value="' + c + '">' + c + '</option>').join('');
+        if (cats.includes(formVal)) formSel.value = formVal;
+        else if (cats.length > 0) formSel.value = cats[0];
+      }
+    }
+
+    function openCategoryManager() {
+      renderCategoryList();
+      document.getElementById('category-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeCategoryManager() {
+      document.getElementById('category-modal').classList.add('hidden');
+    }
+
+    function renderCategoryList() {
+      const list = document.getElementById('category-list');
+      list.innerHTML = promptCategories.map((cat, idx) =>
+        '<div class="flex items-center justify-between px-3 py-2.5 bg-gray-50 rounded-lg group">' +
+        '<div class="flex items-center gap-2 flex-1 min-w-0">' +
+        '<span class="w-2 h-2 rounded-full bg-brand flex-shrink-0"></span>' +
+        '<span class="text-sm text-gray-700">' + cat + '</span></div></div>'
+      ).join('');
+      lucide.createIcons();
+    }
+
+    function addCategory() {
+      const input = document.getElementById('new-category-input');
+      const name = input.value.trim();
+      if (!name) { showToast('请输入分类名称', 'warning'); return; }
+      if (promptCategories.includes(name)) { showToast('该分类已存在', 'warning'); return; }
+      promptCategories.push(name);
+      input.value = '';
+      refreshCategorySelects();
+      renderCategoryList();
+      showToast('分类已添加（新分类将在下次添加指令时生效）', 'success');
+    }
+
+    // ==========================================
+    // 标签管理（本地管理）
+    // ==========================================
+    function renderCommonTags() {
+      const container = document.getElementById('common-tags-list');
+      if (!container) return;
+      const currentTags = document.getElementById('prompt-form-tags').value
+        .split(',').map(t => t.trim()).filter(t => t);
+      container.innerHTML = commonTags.map((tag, idx) => {
+        const isActive = currentTags.includes(tag);
+        return '<button type="button" onclick="toggleCommonTag(\'' + tag + '\')"' +
+          ' class="px-2.5 py-1 rounded-full text-xs font-medium transition-all ' + (isActive ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200') + '">' +
+          tag + '<span class="ml-1 opacity-60 hover:opacity-100 cursor-pointer" onclick="event.stopPropagation();removeCommonTag(' + idx + ')" title="删除此标签">&times;</span></button>';
+      }).join('');
+    }
+
+    function toggleCommonTag(tag) {
+      const input = document.getElementById('prompt-form-tags');
+      let tags = input.value.split(',').map(t => t.trim()).filter(t => t);
+      if (tags.includes(tag)) {
+        tags = tags.filter(t => t !== tag);
+      } else {
+        tags.push(tag);
+      }
+      input.value = tags.join(',');
+      renderCommonTags();
+    }
+
+    function updateTagChips() {
+      renderCommonTags();
+    }
+
+    function addCommonTag() {
+      const input = document.getElementById('new-common-tag-input');
+      const name = input.value.trim();
+      if (!name) { showToast('请输入标签名称', 'warning'); return; }
+      if (commonTags.includes(name)) { showToast('该标签已存在', 'warning'); return; }
+      commonTags.push(name);
+      input.value = '';
+      renderCommonTags();
+      showToast('标签已添加', 'success');
+    }
+
+    function removeCommonTag(idx) {
+      const tag = commonTags[idx];
+      commonTags.splice(idx, 1);
+      renderCommonTags();
+      showToast('已删除标签「' + tag + '」', 'info');
+    }
+
+    // ==========================================
+    // 图片上传管理（保持原有逻辑，base64 本地处理）
+    // ==========================================
+    let currentCover = '';
+    let currentSlides = [];
+
+    function resetImagePreviews() {
+      const coverImg = document.getElementById('cover-img');
+      const coverPlaceholder = document.getElementById('cover-placeholder');
+      coverImg.classList.add('hidden');
+      coverImg.src = '';
+      coverPlaceholder.classList.remove('hidden');
+      const container = document.getElementById('slides-preview');
+      container.innerHTML =
+        '<div id="slides-add-btn" class="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 cursor-pointer hover:border-brand transition-colors" onclick="document.getElementById(\'slides-input\').click()">' +
+        '<div class="text-center"><i data-lucide="plus" class="w-5 h-5 text-gray-300 mx-auto"></i>' +
+        '<p class="text-[10px] text-gray-400 mt-0.5">添加</p></div></div>';
+      lucide.createIcons();
+    }
+
+    function renderImagePreviews() {
+      const coverImg = document.getElementById('cover-img');
+      const coverPlaceholder = document.getElementById('cover-placeholder');
+      if (currentCover) {
+        coverImg.src = currentCover;
+        coverImg.classList.remove('hidden');
+        coverPlaceholder.classList.add('hidden');
+      } else {
+        coverImg.classList.add('hidden');
+        coverPlaceholder.classList.remove('hidden');
+      }
+      const container = document.getElementById('slides-preview');
+      let html = currentSlides.map((src, idx) =>
+        '<div class="relative group slide-item" data-index="' + idx + '">' +
+        '<img src="' + src + '" class="w-20 h-20 rounded-lg object-cover border border-gray-200" alt="效果图' + (idx + 1) + '">' +
+        '<button type="button" onclick="removeSlide(' + idx + ')" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity leading-none">&times;</button>' +
+        (currentCover === src
+          ? '<span class="absolute bottom-0 left-0 right-0 text-center text-[9px] bg-brand text-white rounded-b-lg leading-4">封面</span>'
+          : '<button type="button" onclick="setCoverFromSlide(' + idx + ')" class="absolute bottom-0 left-0 right-0 text-center text-[9px] bg-black/50 text-white rounded-b-lg leading-4 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-brand">设为封面</button>') +
+        '</div>'
+      ).join('');
+      html += '<div id="slides-add-btn" class="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 cursor-pointer hover:border-brand transition-colors" onclick="document.getElementById(\'slides-input\').click()">' +
+        '<div class="text-center"><i data-lucide="plus" class="w-5 h-5 text-gray-300 mx-auto"></i><p class="text-[10px] text-gray-400 mt-0.5">添加</p></div></div>';
+      container.innerHTML = html;
+      lucide.createIcons();
+    }
+
+    function handleCoverUpload(input) {
+      if (!input.files || !input.files[0]) return;
+      const file = input.files[0];
+      if (!file.type.startsWith('image/')) { showToast('请上传图片文件', 'warning'); return; }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        currentCover = e.target.result;
+        renderImagePreviews();
+        document.getElementById('cover-crop-btn').classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+      input.value = '';
+    }
+
+    function handleSlidesUpload(input) {
+      if (!input.files || input.files.length === 0) return;
+      const files = Array.from(input.files);
+      let loaded = 0;
+      files.forEach(file => {
+        if (!file.type.startsWith('image/')) { loaded++; return; }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          currentSlides.push(e.target.result);
+          loaded++;
+          if (loaded === files.length) {
+            if (!currentCover && currentSlides.length > 0) currentCover = currentSlides[0];
+            renderImagePreviews();
+            lucide.createIcons();
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+      input.value = '';
+    }
+
+    function setCoverFromSlide(idx) {
+      currentCover = currentSlides[idx];
+      renderImagePreviews();
+      showToast('已设为封面', 'success');
+    }
+
+    function removeSlide(idx) {
+      const removed = currentSlides[idx];
+      currentSlides.splice(idx, 1);
+      if (currentCover === removed) {
+        currentCover = currentSlides.length > 0 ? currentSlides[0] : '';
+      }
+      renderImagePreviews();
+    }
+
+    // ── 封面裁剪（保持原有逻辑） ──
+    let cropState = {
+      originalSrc: '', imgW: 0, imgH: 0,
+      canvasW: 360, canvasH: 360,
+      scale: 1, offsetX: 0, offsetY: 0,
+      box: { x: 40, y: 40, w: 280, h: 280 },
+      dragging: null, dragStartX: 0, dragStartY: 0, dragStartBox: null
+    };
+
+    function openCoverCropper() {
+      if (!currentCover) { showToast('请先上传图片', 'warning'); return; }
+      cropState.originalSrc = currentCover;
+      const img = new Image();
+      img.onload = function() {
+        cropState.imgW = img.width;
+        cropState.imgH = img.height;
+        initCropCanvas(img);
+        document.getElementById('cover-crop-modal').classList.remove('hidden');
+        lucide.createIcons();
+      };
+      img.src = cropState.originalSrc;
+    }
+
+    function initCropCanvas(img) {
+      const cw = cropState.canvasW;
+      const ch = cropState.canvasH;
+      const canvas = document.getElementById('crop-canvas');
+      canvas.width = cw;
+      canvas.height = ch;
+      const ctx = canvas.getContext('2d');
+      const scale = Math.min(cw / img.width, ch / img.height);
+      cropState.scale = scale;
+      const drawW = img.width * scale;
+      const drawH = img.height * scale;
+      cropState.offsetX = (cw - drawW) / 2;
+      cropState.offsetY = (ch - drawH) / 2;
+      ctx.clearRect(0, 0, cw, ch);
+      ctx.drawImage(img, cropState.offsetX, cropState.offsetY, drawW, drawH);
+      const boxSize = Math.min(drawW, drawH);
+      cropState.box = {
+        x: cropState.offsetX + (drawW - boxSize) / 2,
+        y: cropState.offsetY + (drawH - boxSize) / 2,
+        w: boxSize, h: boxSize
+      };
+      updateCropBox();
+      bindCropEvents();
+      setTimeout(function() {
+        const canvas2 = document.getElementById('crop-canvas');
+        const ctx2 = canvas2.getContext('2d');
+        ctx2.clearRect(0, 0, cw, ch);
+        ctx2.drawImage(img, cropState.offsetX, cropState.offsetY, drawW, drawH);
+      }, 50);
+    }
+
+    function updateCropBox() {
+      const box = cropState.box;
+      const el = document.getElementById('crop-box');
+      el.style.left = box.x + 'px';
+      el.style.top = box.y + 'px';
+      el.style.width = box.w + 'px';
+      el.style.height = box.h + 'px';
+    }
+
+    function bindCropEvents() {
+      if (cropState._eventsBound) return;
+      cropState._eventsBound = true;
+      const box = document.getElementById('crop-box');
+      if (!box) return;
+      box.addEventListener('mousedown', function(e) {
+        if (e.target.classList.contains('crop-handle') || e.target.classList.contains('crop-handle-edge')) return;
+        e.preventDefault();
+        cropState.dragging = 'move';
+        cropState.dragStartX = e.clientX;
+        cropState.dragStartY = e.clientY;
+        cropState.dragStartBox = { ...cropState.box };
+      });
+      box.querySelectorAll('.crop-handle, .crop-handle-edge').forEach(handle => {
+        handle.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          cropState.dragging = handle.dataset.dir;
+          cropState.dragStartX = e.clientX;
+          cropState.dragStartY = e.clientY;
+          cropState.dragStartBox = { ...cropState.box };
+        });
+      });
+      document.addEventListener('mousemove', onCropMouseMove);
+      document.addEventListener('mouseup', onCropMouseUp);
+    }
+
+    function onCropMouseMove(e) {
+      if (!cropState.dragging) return;
+      e.preventDefault();
+      const dx = e.clientX - cropState.dragStartX;
+      const dy = e.clientY - cropState.dragStartY;
+      const sb = cropState.dragStartBox;
+      const cw = cropState.canvasW;
+      const ch = cropState.canvasH;
+      const minSize = 60;
+      const dir = cropState.dragging;
+      if (dir === 'move') {
+        let nx = sb.x + dx;
+        let ny = sb.y + dy;
+        nx = Math.max(0, Math.min(cw - sb.w, nx));
+        ny = Math.max(0, Math.min(ch - sb.h, ny));
+        cropState.box = { x: nx, y: ny, w: sb.w, h: sb.h };
+      } else {
+        let { x, y, w, h } = sb;
+        if (dir.includes('e')) { w = Math.max(minSize, w + dx); }
+        if (dir.includes('w')) { const nw = Math.max(minSize, w - dx); x = sb.x + (w - nw); w = nw; }
+        if (dir.includes('s')) { h = Math.max(minSize, h + dy); }
+        if (dir.includes('n')) { const nh = Math.max(minSize, h - dy); y = sb.y + (h - nh); h = nh; }
+        x = Math.max(0, x); y = Math.max(0, y);
+        if (x + w > cw) w = cw - x;
+        if (y + h > ch) h = ch - y;
+        cropState.box = { x, y, w, h };
+      }
+      updateCropBox();
+    }
+
+    function onCropMouseUp() {
+      cropState.dragging = null;
+    }
+
+    function applyCoverCrop() {
+      const box = cropState.box;
+      const scale = cropState.scale;
+      const sx = (box.x - cropState.offsetX) / scale;
+      const sy = (box.y - cropState.offsetY) / scale;
+      const sw = box.w / scale;
+      const sh = box.h / scale;
+      const outCanvas = document.createElement('canvas');
+      const outSize = 200;
+      outCanvas.width = outSize;
+      outCanvas.height = outSize;
+      const ctx = outCanvas.getContext('2d');
+      const img = new Image();
+      img.onload = function() {
+        const cropW = Math.min(sw, sh);
+        const cropH = cropW;
+        const cropX = sx + (sw - cropW) / 2;
+        const cropY = sy + (sh - cropH) / 2;
+        ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, outSize, outSize);
+        currentCover = outCanvas.toDataURL('image/jpeg', 0.85);
+        renderImagePreviews();
+        closeCoverCropper();
+        showToast('封面已更新', 'success');
+      };
+      img.src = cropState.originalSrc;
+    }
+
+    function closeCoverCropper() {
+      document.getElementById('cover-crop-modal').classList.add('hidden');
+      cropState.dragging = null;
+    }
+
+    // ==========================================
+    // Banner 管理（本地管理，后端暂无 API）
+    // ==========================================
+    let editingBannerId = null;
+    let currentBannerImage = '';
+
+    function renderBanners() {
+      const tbody = document.getElementById('banner-table-body');
+      if (!tbody) return;
+      const sortedBanners = [...banners].sort((a, b) => a.sort - b.sort);
+      const typeNames = { none: '不跳转', prompt: '指令详情', vip: '会员权益', invite: '邀请拉新', credits: '积分规则', custom: '自定义' };
+      tbody.innerHTML = sortedBanners.map(b =>
+        '<tr class="hover:bg-brand-light/30 transition-colors">' +
+        '<td class="px-5 py-3.5"><div class="w-24 h-12 rounded-lg overflow-hidden bg-gray-100">' +
+        (b.image ? '<img src="' + b.image + '" class="w-full h-full object-cover" alt="">' : '<div class="w-full h-full flex items-center justify-center"><span class="text-xs text-gray-400">无图片</span></div>') +
+        '</div></td>' +
+        '<td class="px-5 py-3.5"><span class="text-sm font-medium text-gray-800">' + b.title + '</span></td>' +
+        '<td class="px-5 py-3.5"><span class="text-sm text-gray-500 truncate max-w-[160px] block">' + (b.subtitle || '-') + '</span></td>' +
+        '<td class="px-5 py-3.5"><span class="text-xs font-medium px-2 py-1 rounded-full bg-brand/10 text-brand">' + (typeNames[b.linkType] || b.linkType) + '</span></td>' +
+        '<td class="px-5 py-3.5"><span class="text-sm text-gray-500">' + (b.linkParam || '-') + '</span></td>' +
+        '<td class="px-5 py-3.5 text-center"><button onclick="toggleBannerStatus(' + b.id + ')" class="px-2.5 py-1 text-xs font-medium rounded-full ' + (b.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500') + '">' + (b.status === 'active' ? '上架中' : '已下架') + '</button></td>' +
+        '<td class="px-5 py-3.5 text-center"><span class="text-sm text-gray-500">' + b.sort + '</span></td>' +
+        '<td class="px-5 py-3.5 text-center"><div class="flex items-center justify-center gap-1">' +
+        '<button onclick="editBanner(' + b.id + ')" class="p-1.5 text-gray-400 hover:text-brand rounded-md" title="编辑"><i data-lucide="pencil" class="w-4 h-4"></i></button>' +
+        '<button onclick="deleteBanner(' + b.id + ')" class="p-1.5 text-gray-400 hover:text-red-500 rounded-md" title="删除"><i data-lucide="trash-2" class="w-4 h-4"></i></button>' +
+        '</div></td></tr>'
+      ).join('');
+      lucide.createIcons();
+    }
+
+    function openBannerModal() {
+      editingBannerId = null;
+      document.getElementById('banner-modal-title').textContent = '添加 Banner';
+      document.getElementById('banner-form-title').value = '';
+      document.getElementById('banner-form-subtitle').value = '';
+      document.getElementById('banner-form-link-type').value = 'none';
+      document.getElementById('banner-form-link-param').value = '';
+      document.getElementById('banner-form-gradient-start').value = '#FF6B9D';
+      document.getElementById('banner-form-gradient-end').value = '#C4B5FD';
+      document.getElementById('banner-form-sort').value = String(banners.length);
+      currentBannerImage = '';
+      document.getElementById('banner-image-preview').classList.add('hidden');
+      document.getElementById('banner-image-placeholder').classList.remove('hidden');
+      document.getElementById('banner-link-param-wrap').style.display = 'none';
+      document.getElementById('banner-link-hint').textContent = '';
+      document.getElementById('banner-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeBannerModal() {
+      document.getElementById('banner-modal').classList.add('hidden');
+      editingBannerId = null;
+    }
+
+    function editBanner(id) {
+      const b = banners.find(x => x.id === id);
+      if (!b) return;
+      editingBannerId = id;
+      document.getElementById('banner-modal-title').textContent = '编辑 Banner';
+      document.getElementById('banner-form-title').value = b.title;
+      document.getElementById('banner-form-subtitle').value = b.subtitle || '';
+      document.getElementById('banner-form-link-type').value = b.linkType;
+      document.getElementById('banner-form-link-param').value = b.linkParam || '';
+      document.getElementById('banner-form-gradient-start').value = b.gradientStart || '#FF6B9D';
+      document.getElementById('banner-form-gradient-end').value = b.gradientEnd || '#C4B5FD';
+      document.getElementById('banner-form-sort').value = String(b.sort);
+      currentBannerImage = b.image || '';
+      if (currentBannerImage) {
+        document.getElementById('banner-image-preview').src = currentBannerImage;
+        document.getElementById('banner-image-preview').classList.remove('hidden');
+        document.getElementById('banner-image-placeholder').classList.add('hidden');
+      } else {
+        document.getElementById('banner-image-preview').classList.add('hidden');
+        document.getElementById('banner-image-placeholder').classList.remove('hidden');
+      }
+      updateBannerLinkHint();
+      document.getElementById('banner-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function handleBannerImageUpload(input) {
+      if (!input.files || !input.files[0]) return;
+      const file = input.files[0];
+      if (!file.type.startsWith('image/')) { showToast('请上传图片文件', 'warning'); return; }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        currentBannerImage = e.target.result;
+        document.getElementById('banner-image-preview').src = currentBannerImage;
+        document.getElementById('banner-image-preview').classList.remove('hidden');
+        document.getElementById('banner-image-placeholder').classList.add('hidden');
+      };
+      reader.readAsDataURL(file);
+      input.value = '';
+    }
+
+    function updateBannerLinkHint() {
+      const type = document.getElementById('banner-form-link-type').value;
+      const paramWrap = document.getElementById('banner-link-param-wrap');
+      const hint = document.getElementById('banner-link-hint');
+      const hints = { none: '点击不执行任何跳转', prompt: '跳转到指定指令详情页', vip: '跳转到会员权益说明页', invite: '跳转到邀请拉新活动页', credits: '跳转到积分规则说明页', custom: '输入自定义小程序页面路径' };
+      hint.textContent = hints[type] || '';
+      paramWrap.style.display = (type === 'none') ? 'none' : 'block';
+    }
+
+    function saveBanner() {
+      const title = document.getElementById('banner-form-title').value.trim();
+      if (!title) { showToast('请输入 Banner 标题', 'warning'); return; }
+      const data = {
+        title,
+        subtitle: document.getElementById('banner-form-subtitle').value.trim(),
+        linkType: document.getElementById('banner-form-link-type').value,
+        linkParam: document.getElementById('banner-form-link-param').value.trim(),
+        image: currentBannerImage,
+        gradientStart: document.getElementById('banner-form-gradient-start').value,
+        gradientEnd: document.getElementById('banner-form-gradient-end').value,
+        sort: parseInt(document.getElementById('banner-form-sort').value) || 0
+      };
+      if (editingBannerId) {
+        const idx = banners.findIndex(x => x.id === editingBannerId);
+        if (idx >= 0) { banners[idx] = { ...banners[idx], ...data }; addLog('编辑了Banner「' + title + '」', 'edit'); showToast('Banner已更新', 'success'); }
+      } else {
+        banners.push({ id: nextBannerId++, ...data, status: 'active' });
+        addLog('添加了Banner「' + title + '」', 'add');
+        showToast('Banner已添加', 'success');
+      }
+      renderBanners();
+      closeBannerModal();
+    }
+
+    function toggleBannerStatus(id) {
+      const b = banners.find(x => x.id === id);
+      if (b) { b.status = b.status === 'active' ? 'inactive' : 'active'; renderBanners(); showToast('Banner状态已更新', 'success'); }
+    }
+
+    function deleteBanner(id) {
+      const b = banners.find(x => x.id === id);
+      showConfirm('删除Banner', '确定要删除Banner「' + (b ? b.title : '') + '」吗？', function() {
+        banners = banners.filter(x => x.id !== id);
+        renderBanners();
+        addLog('删除了一个Banner', 'delete');
+        showToast('Banner已删除', 'success');
+      });
+    }
+
+    // ==========================================
+    // 弹窗遮罩关闭 / ESC 关闭
+    // ==========================================
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      overlay.addEventListener('click', function(e) {
+        if (e.target === this) this.classList.add('hidden');
+      });
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(modal => {
+          modal.classList.add('hidden');
+        });
+      }
+    });
+  </script>
+</body>
+</html>
