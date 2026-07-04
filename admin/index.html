@@ -1157,6 +1157,15 @@
         headers: authHeaders(),
         body: JSON.stringify(body)
       });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error('HTTP ' + res.status + ': ' + text.substring(0, 200));
+      }
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('text/html')) {
+        const text = await res.text();
+        throw new Error('返回了HTML页面而非JSON: ' + text.substring(0, 200));
+      }
       return res.json();
     }
 
@@ -1166,6 +1175,10 @@
         headers: authHeaders(),
         body: JSON.stringify(body)
       });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error('HTTP ' + res.status + ': ' + text.substring(0, 200));
+      }
       return res.json();
     }
 
@@ -1682,7 +1695,7 @@
         renderPrompts();
       } catch (err) {
         console.error('保存指令失败:', err);
-        showToast('保存失败，请检查网络连接', 'error');
+        showToast('保存失败: ' + err.message, 'error');
       }
     }
 
