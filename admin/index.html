@@ -1643,7 +1643,8 @@
       const category = document.getElementById('prompt-form-category').value;
       const weight = parseInt(document.getElementById('prompt-form-cost').value) || 0;
       const content = document.getElementById('prompt-form-prompt').value.trim();
-      const tags = document.getElementById('prompt-form-tags').value.trim();
+      const tagsStr = document.getElementById('prompt-form-tags').value.trim();
+      const tagsArr = tagsStr ? tagsStr.split(',').map(t => t.trim()).filter(Boolean) : [];
       const description = document.getElementById('prompt-form-tip').value.trim();
 
       if (!title) { showToast('请输入指令标题', 'warning'); return; }
@@ -1654,9 +1655,9 @@
         category: category,
         content: content,
         description: description,
-        tags: tags,
+        tags: tagsArr,
         cover: currentCover,
-        images: JSON.stringify(currentSlides),
+        images: currentSlides,
         weight: weight,
         is_top: 0,
         is_recommended: 0
