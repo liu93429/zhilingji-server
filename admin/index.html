@@ -1515,9 +1515,11 @@
         emptyEl.classList.add('hidden');
 
         tbody.innerHTML = filtered.map(p => {
-          // 解析 tags
-          let tagsArray = [];
-          try { tagsArray = p.tags ? JSON.parse(p.tags) : []; } catch(e) { tagsArray = p.tags ? p.tags.split(',').map(t => t.trim()) : []; }
+          // 解析 tags（后端 GET 接口已返回数组，POST 前端传的也是数组）
+          let tagsArray = Array.isArray(p.tags) ? p.tags : [];
+          if (typeof p.tags === 'string') {
+            try { tagsArray = JSON.parse(p.tags); } catch(e) { tagsArray = p.tags.split(',').map(t => t.trim()); }
+          }
           if (!Array.isArray(tagsArray)) tagsArray = [];
 
           const tagsHtml = tagsArray.slice(0, 3).map(tag =>
@@ -1611,12 +1613,13 @@
 
       // 图片
       currentCover = prompt.cover || '';
-      let slidesArr = [];
-      try {
-        slidesArr = prompt.images ? JSON.parse(prompt.images) : [];
-        if (!Array.isArray(slidesArr)) slidesArr = [];
-      } catch(e) {
-        slidesArr = [];
+      let slidesArr = Array.isArray(prompt.images) ? prompt.images : [];
+      if (typeof prompt.images === 'string') {
+        try {
+          slidesArr = JSON.parse(prompt.images);
+        } catch(e) {
+          slidesArr = [];
+        }
       }
       currentSlides = slidesArr;
       renderImagePreviews();
