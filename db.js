@@ -1,334 +1,956 @@
-const initSqlJs = require('sql.js');
-const fs = require('fs');
-const path = require('path');
+const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const { db, initDb } = require('./db.js');
 
-const dbPath = process.env.VERCEL
-  ? path.join('/tmp', 'data.db')
-  : path.join(__dirname, 'data.db');
-let db = null;
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-async function initDatabase() {
-  const SQL = await initSqlJs();
+app.use(cors());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-  if (fs.existsSync(dbPath)) {
-    const buffer = fs.readFileSync(dbPath);
-    db = new SQL.Database(buffer);
-  } else {
-    db = new SQL.Database();
-  }
+app.use('/admin', express.static(__dirname + '/admin'));
 
-  // 创建所有表
-  db.run(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      openid TEXT UNIQUE NOT NULL,
-      nickname TEXT DEFAULT '指令集用户',
-      avatar TEXT DEFAULT '',
-      credits INTEGER DEFAULT 0,
-      total_earned INTEGER DEFAULT 10,
-      total_spent INTEGER DEFAULT 0,
-      inviter_openid TEXT DEFAULT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
+function getToday() {
+  return new Date().toISOString().split('T')[0];
+}
 
-    CREATE TABLE IF NOT EXISTS prompts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      description TEXT DEFAULT '',
-      content TEXT NOT NULL,
-      category TEXT DEFAULT '',
-      tags TEXT DEFAULT '[]',
-      cover TEXT DEFAULT '',
-      images TEXT DEFAULT '[]',
-      copy_count INTEGER DEFAULT 0,
-      ad_unlock_count INTEGER DEFAULT 0,
-      view_count INTEGER DEFAULT 0,
-      is_top INTEGER DEFAULT 0,
-      weight REAL DEFAULT 1.0,
-      is_recommended INTEGER DEFAULT 0,
-      status INTEGER DEFAULT 1,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
+function getUserByOpenid(openid) {
+  return db.prepare('SELECT * FROM users WHERE openid = ?').get(openid);
+}
 
-    CREATE TABLE IF NOT EXISTS purchased (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_openid TEXT NOT NULL,
-      prompt_id INTEGER NOT NULL,
-      purchase_method TEXT DEFAULT 'credits',
-      purchased_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(user_openid, prompt_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS favorites (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_openid TEXT NOT NULL,
-      prompt_id INTEGER NOT NULL,
-      folder_id TEXT DEFAULT 'default',
-      favorited_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(user_openid, prompt_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS favorite_folders (
-      id TEXT PRIMARY KEY,
-      user_openid TEXT NOT NULL,
-      name TEXT NOT NULL,
-      count INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS checkins (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_openid TEXT NOT NULL,
-      checkin_date TEXT NOT NULL,
-      streak INTEGER DEFAULT 0,
-      reward INTEGER DEFAULT 1,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(user_openid, checkin_date)
-    );
-
-    CREATE TABLE IF NOT EXISTS credits_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_openid TEXT NOT NULL,
-      type TEXT NOT NULL,
-      amount INTEGER NOT NULL,
-      reason TEXT DEFAULT '',
-      detail TEXT DEFAULT '',
-      balance INTEGER NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS ad_watches (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_openid TEXT NOT NULL,
-      watch_date TEXT NOT NULL,
-      count INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(user_openid, watch_date)
-    );
-
-    CREATE TABLE IF NOT EXISTS share_rewards (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_openid TEXT NOT NULL,
-      reward_date TEXT NOT NULL,
-      count INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(user_openid, reward_date)
-    );
-
-    CREATE TABLE IF NOT EXISTS admin_users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS feedback (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_openid TEXT NOT NULL,
-      content TEXT NOT NULL,
-      status INTEGER DEFAULT 0,
-      reply TEXT DEFAULT '',
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
+function createUser(openid) {
+  const stmt = db.prepare(`
+    INSERT INTO users (openid, nickname, credits, total_earned, total_spent)
+    VALUES (?, '指令集用户', 0, 0, 0)
   `);
-
-  const promptCount = prepare('SELECT COUNT(*) as count FROM prompts').get().count;
-  if (promptCount === 0) {
-    const samplePrompts = [
-      {
-        title: '仙气古风写真',
-        description: '柔光古风妆容，汉服造型，水墨背景虚化',
-        content: '生成一张仙气飘飘的古风写真，人物身穿白色汉服，手持折扇，背景为云雾缭绕的山水画卷，柔和光影，高清质感，8K分辨率',
-        category: '人像写真',
-        tags: JSON.stringify(['古风', '仙女', '汉服']),
-        cover: 'https://picsum.photos/seed/gufeng/800/600',
-        images: JSON.stringify([
-          'https://picsum.photos/seed/gufeng/800/600',
-          'https://picsum.photos/seed/gufeng2/800/600'
-        ]),
-        copyCount: 1280,
-        adUnlockCount: 356,
-        viewCount: 5600,
-        isTop: 0,
-        weight: 1,
-        isRecommended: 1,
-        createdAt: '2026-06-25'
-      },
-      {
-        title: '职场精英证件照',
-        description: '专业商务妆容，柔和正面光线，灰蓝色背景',
-        content: '专业职业证件照，职场精英形象，精致商务妆容，正面柔和打光，纯净灰蓝色背景，西装革履，自信微笑',
-        category: '人像写真',
-        tags: JSON.stringify(['证件照', '商务', '职场']),
-        cover: 'https://picsum.photos/seed/zhengjian/800/600',
-        images: JSON.stringify([
-          'https://picsum.photos/seed/zhengjian/800/600'
-        ]),
-        copyCount: 892,
-        adUnlockCount: 234,
-        viewCount: 3200,
-        isTop: 1,
-        weight: 1.5,
-        isRecommended: 1,
-        createdAt: '2026-06-26'
-      },
-      {
-        title: '梦幻二次元少女',
-        description: '日系动漫风格，梦幻光影，精致二次元美少女',
-        content: '梦幻二次元美少女，日系动漫风格，精致大眼睛，樱花粉色长发，可爱表情，梦幻光影效果',
-        category: '创意艺术',
-        tags: JSON.stringify(['二次元', '动漫', '梦幻']),
-        cover: 'https://picsum.photos/seed/erciyuan/800/600',
-        images: JSON.stringify([
-          'https://picsum.photos/seed/erciyuan/800/600',
-          'https://picsum.photos/seed/erciyuan2/800/600'
-        ]),
-        copyCount: 2560,
-        adUnlockCount: 678,
-        viewCount: 8900,
-        isTop: 0,
-        weight: 1.2,
-        isRecommended: 1,
-        createdAt: '2026-06-24'
-      },
-      {
-        title: '赛博朋克霓虹',
-        description: '未来科幻风格，霓虹灯光映射，机械义体元素',
-        content: '赛博朋克风格人像，未来科幻都市背景，霓虹灯光映射，机械义体元素，暗色调科幻城市',
-        category: '创意艺术',
-        tags: JSON.stringify(['赛博朋克', '夜景', '科幻']),
-        cover: 'https://picsum.photos/seed/saibo/800/600',
-        images: JSON.stringify([
-          'https://picsum.photos/seed/saibo/800/600',
-          'https://picsum.photos/seed/saibo2/800/600'
-        ]),
-        copyCount: 3120,
-        adUnlockCount: 890,
-        viewCount: 12000,
-        isTop: 0,
-        weight: 1.3,
-        isRecommended: 1,
-        createdAt: '2026-06-22'
-      },
-      {
-        title: '山川湖海风景',
-        description: '壮丽自然风光，山川湖海，大气磅礴',
-        content: '壮丽自然风光摄影，山川湖海交相辉映，日出时分的金色光芒，云海翻涌，镜面般的湖水倒影',
-        category: '风景',
-        tags: JSON.stringify(['风景', '自然', '山川']),
-        cover: 'https://picsum.photos/seed/fengjing/800/600',
-        images: JSON.stringify([
-          'https://picsum.photos/seed/fengjing/800/600'
-        ]),
-        copyCount: 2100,
-        adUnlockCount: 612,
-        viewCount: 7800,
-        isTop: 0,
-        weight: 1,
-        isRecommended: 0,
-        createdAt: '2026-06-19'
-      },
-      {
-        title: '复古胶片港风',
-        description: '经典港式复古滤镜，温暖颗粒质感，怀旧色调',
-        content: '复古港风写真，经典港式复古滤镜，温暖颗粒质感，怀旧色调，街头随性拍摄，90年代港星风格',
-        category: '复古胶片',
-        tags: JSON.stringify(['复古', '港风', '胶片']),
-        cover: 'https://picsum.photos/seed/gangfeng/800/600',
-        images: JSON.stringify([
-          'https://picsum.photos/seed/gangfeng/800/600'
-        ]),
-        copyCount: 1450,
-        adUnlockCount: 423,
-        viewCount: 4500,
-        isTop: 0,
-        weight: 1.1,
-        isRecommended: 1,
-        createdAt: '2026-06-20'
-      }
-    ];
-
-    for (const p of samplePrompts) {
-      prepare(`
-        INSERT INTO prompts (title, description, content, category, tags, cover, images, copy_count, ad_unlock_count, view_count, is_top, weight, is_recommended, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        p.title, p.description, p.content, p.category, p.tags,
-        p.cover, p.images, p.copyCount, p.adUnlockCount, p.viewCount,
-        p.isTop, p.weight, p.isRecommended, p.createdAt
-      );
-    }
-  }
-
-  const adminCount = prepare('SELECT COUNT(*) as count FROM admin_users').get().count;
-  if (adminCount === 0) {
-    prepare('INSERT INTO admin_users (username, password) VALUES (?, ?)').run('admin', 'admin123');
-  }
-
-  saveDatabase();
-  console.log('数据库初始化完成');
+  stmt.run(openid);
+  return getUserByOpenid(openid);
 }
 
-function saveDatabase() {
-  const data = db.export();
-  const buffer = Buffer.from(data);
-  fs.writeFileSync(dbPath, buffer);
+function getOrCreateUser(openid) {
+  let user = getUserByOpenid(openid);
+  if (!user) {
+    user = createUser(openid);
+    const defaultFolder = db.prepare(`
+      INSERT OR IGNORE INTO favorite_folders (id, user_openid, name, count)
+      VALUES ('default', ?, '默认收藏夹', 0)
+    `);
+    defaultFolder.run(openid);
+  }
+  return user;
 }
 
-function prepare(sql) {
-  return {
-    get(...params) {
-      const stmt = db.prepare(sql);
-      stmt.bind(params);
-      if (stmt.step()) {
-        const row = stmt.getAsObject();
-        stmt.free();
-        return row;
-      }
-      stmt.free();
-      return undefined;
-    },
-    all(...params) {
-      const stmt = db.prepare(sql);
-      stmt.bind(params);
-      const results = [];
-      while (stmt.step()) {
-        results.push(stmt.getAsObject());
-      }
-      stmt.free();
-      return results;
-    },
-    run(...params) {
-      db.run(sql, params);
-      saveDatabase();
-      try {
-        const lastId = db.exec('SELECT last_insert_rowid()');
-        return {
-          lastInsertRowid: (lastId && lastId[0] && lastId[0].values && lastId[0].values[0]) ? lastId[0].values[0][0] : 0,
-          changes: 1
-        };
-      } catch (e) {
-        return { lastInsertRowid: 0, changes: 1 };
+function addCreditsLog(openid, type, amount, reason, detail, balance) {
+  db.prepare(`
+    INSERT INTO credits_log (user_openid, type, amount, reason, detail, balance)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(openid, type, amount, reason, detail, balance);
+}
+
+function updateUserCredits(openid, amount, type, reason, detail) {
+  const user = getOrCreateUser(openid);
+  const newCredits = user.credits + amount;
+  
+  let totalEarned = user.total_earned;
+  let totalSpent = user.total_spent;
+  
+  if (amount > 0) {
+    totalEarned += amount;
+  } else {
+    totalSpent += Math.abs(amount);
+  }
+  
+  db.prepare(`
+    UPDATE users 
+    SET credits = ?, total_earned = ?, total_spent = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE openid = ?
+  `).run(newCredits, totalEarned, totalSpent, openid);
+  
+  addCreditsLog(openid, type, Math.abs(amount), reason, detail, newCredits);
+  
+  return newCredits;
+}
+
+app.post('/api/user/login', (req, res) => {
+  const { code } = req.body;
+  
+  const mockOpenid = 'openid_' + (code || Math.random().toString(36).substr(2, 10));
+  const user = getOrCreateUser(mockOpenid);
+  
+  res.json({
+    code: 0,
+    data: {
+      openid: mockOpenid,
+      userInfo: {
+        nickname: user.nickname,
+        avatar: user.avatar,
+        credits: user.credits
       }
     }
-  };
-}
+  });
+});
 
-const originalDb = {
-  exec(sql) {
-    db.exec(sql);
-    saveDatabase();
-  },
-  prepare
-};
+app.get('/api/user/info', (req, res) => {
+  const openid = req.headers.authorization;
+  if (!openid) {
+    return res.json({ code: 1, message: '未登录' });
+  }
+  
+  const user = getOrCreateUser(openid);
+  res.json({
+    code: 0,
+    data: user
+  });
+});
 
-function initDb() {
-  return initDatabase();
-}
+app.put('/api/user/info', (req, res) => {
+  const openid = req.headers.authorization;
+  if (!openid) {
+    return res.json({ code: 1, message: '未登录' });
+  }
+  
+  const { nickname, avatar } = req.body;
+  const fields = [];
+  const values = [];
+  
+  if (nickname !== undefined) {
+    fields.push('nickname = ?');
+    values.push(nickname);
+  }
+  if (avatar !== undefined) {
+    fields.push('avatar = ?');
+    values.push(avatar);
+  }
+  
+  if (fields.length > 0) {
+    fields.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(openid);
+    db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE openid = ?`).run(...values);
+  }
+  
+  const user = getUserByOpenid(openid);
+  res.json({
+    code: 0,
+    data: user
+  });
+});
 
-module.exports = {
-  db: originalDb,
-  initDb
-};
+app.get('/api/prompts', (req, res) => {
+  const { category = 'all', keyword = '', sortBy = 'time', limit, page = 1, pageSize = 20 } = req.query;
+  
+  let sql = 'SELECT * FROM prompts WHERE status = 1';
+  let params = [];
+  
+  if (category !== 'all') {
+    sql += ' AND category = ?';
+    params.push(category);
+  }
+  
+  if (keyword) {
+    sql += ' AND (title LIKE ? OR description LIKE ? OR tags LIKE ?)';
+    const kw = '%' + keyword + '%';
+    params.push(kw, kw, kw);
+  }
+  
+  if (sortBy === 'hot') {
+    sql += ' ORDER BY is_top DESC, (copy_count * weight) DESC';
+  } else {
+    sql += ' ORDER BY is_top DESC, created_at DESC';
+  }
+  
+  const offset = (page - 1) * pageSize;
+  sql += ' LIMIT ? OFFSET ?';
+  params.push(parseInt(pageSize), parseInt(offset));
+  
+  const prompts = db.prepare(sql).all(...params).map(p => ({
+    ...p,
+    tags: JSON.parse(p.tags || '[]'),
+    images: JSON.parse(p.images || '[]')
+  }));
+  
+  const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as total').split(' ORDER BY')[0].split(' LIMIT')[0];
+  const total = db.prepare(countSql).get(...params.slice(0, params.length - 2)).total;
+  
+  res.json({
+    code: 0,
+    data: {
+      list: prompts,
+      total,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize)
+    }
+  });
+});
+
+app.get('/api/prompts/hot', (req, res) => {
+  const { timeRange = 'all' } = req.query;
+  
+  let sql = 'SELECT * FROM prompts WHERE status = 1';
+  let params = [];
+  
+  if (timeRange === 'week') {
+    sql += ' AND created_at >= date("now", "-7 days")';
+  } else if (timeRange === 'month') {
+    sql += ' AND created_at >= date("now", "-30 days")';
+  }
+  
+  sql += ' ORDER BY is_top DESC, (copy_count * weight) DESC LIMIT 50';
+  
+  const prompts = db.prepare(sql).all(...params).map(p => ({
+    ...p,
+    tags: JSON.parse(p.tags || '[]'),
+    images: JSON.parse(p.images || '[]')
+  }));
+  
+  res.json({
+    code: 0,
+    data: prompts
+  });
+});
+
+app.get('/api/prompts/recommended', (req, res) => {
+  const prompts = db.prepare(`
+    SELECT * FROM prompts 
+    WHERE status = 1 AND is_recommended = 1 
+    ORDER BY is_top DESC, created_at DESC 
+    LIMIT 10
+  `).all().map(p => ({
+    ...p,
+    tags: JSON.parse(p.tags || '[]'),
+    images: JSON.parse(p.images || '[]')
+  }));
+  
+  res.json({
+    code: 0,
+    data: prompts
+  });
+});
+
+app.get('/api/prompts/:id', (req, res) => {
+  const { id } = req.params;
+  const prompt = db.prepare('SELECT * FROM prompts WHERE id = ?').get(id);
+  
+  if (!prompt) {
+    return res.json({ code: 1, message: '指令不存在' });
+  }
+  
+  db.prepare('UPDATE prompts SET view_count = view_count + 1 WHERE id = ?').run(id);
+  
+  prompt.tags = JSON.parse(prompt.tags || '[]');
+  prompt.images = JSON.parse(prompt.images || '[]');
+  
+  res.json({
+    code: 0,
+    data: prompt
+  });
+});
+
+app.post('/api/prompts/:id/copy', (req, res) => {
+  const openid = req.headers.authorization;
+  const { id } = req.params;
+  
+  if (!openid) {
+    return res.json({ code: 1, message: '未登录' });
+  }
+  
+  const user = getOrCreateUser(openid);
+  const prompt = db.prepare('SELECT * FROM prompts WHERE id = ?').get(id);
+  
+  if (!prompt) {
+    return res.json({ code: 1, message: '指令不存在' });
+  }
+  
+  const existing = db.prepare('SELECT * FROM purchased WHERE user_openid = ? AND prompt_id = ?').get(openid, id);
+  if (existing) {
+    return res.json({
+      code: 0,
+      data: {
+        ...prompt,
+        tags: JSON.parse(prompt.tags || '[]'),
+        images: JSON.parse(prompt.images || '[]'),
+        alreadyOwned: true
+      }
+    });
+  }
+  
+  if (user.credits < 1) {
+    return res.json({ code: 2, message: '积分不足' });
+  }
+  
+  updateUserCredits(openid, -1, 'spend', '复制指令', prompt.title);
+  
+  db.prepare('INSERT INTO purchased (user_openid, prompt_id, purchase_method) VALUES (?, ?, ?)').run(openid, id, 'credits');
+  db.prepare('UPDATE prompts SET copy_count = copy_count + 1 WHERE id = ?').run(id);
+  
+  const updatedPrompt = db.prepare('SELECT * FROM prompts WHERE id = ?').get(id);
+  updatedPrompt.tags = JSON.parse(updatedPrompt.tags || '[]');
+  updatedPrompt.images = JSON.parse(updatedPrompt.images || '[]');
+  
+  res.json({
+    code: 0,
+    data: updatedPrompt
+  });
+});
+
+app.post('/api/prompts/:id/ad-unlock', (req, res) => {
+  const openid = req.headers.authorization;
+  const { id } = req.params;
+  
+  if (!openid) {
+    return res.json({ code: 1, message: '未登录' });
+  }
+  
+  getOrCreateUser(openid);
+  const prompt = db.prepare('SELECT * FROM prompts WHERE id = ?').get(id);
+  
+  if (!prompt) {
+    return res.json({ code: 1, message: '指令不存在' });
+  }
+  
+  const existing = db.prepare('SELECT * FROM purchased WHERE user_openid = ? AND prompt_id = ?').get(openid, id);
+  if (existing) {
+    return res.json({
+      code: 0,
+      data: {
+        ...prompt,
+        tags: JSON.parse(prompt.tags || '[]'),
+        images: JSON.parse(prompt.images || '[]'),
+        alreadyOwned: true
+      }
+    });
+  }
+  
+  db.prepare('INSERT INTO purchased (user_openid, prompt_id, purchase_method) VALUES (?, ?, ?)').run(openid, id, 'ad');
+  db.prepare('UPDATE prompts SET ad_unlock_count = ad_unlock_count + 1, copy_count = copy_count + 1 WHERE id = ?').run(id);
+  
+  const updatedPrompt = db.prepare('SELECT * FROM prompts WHERE id = ?').get(id);
+  updatedPrompt.tags = JSON.parse(updatedPrompt.tags || '[]');
+  updatedPrompt.images = JSON.parse(updatedPrompt.images || '[]');
+  
+  res.json({
+    code: 0,
+    data: updatedPrompt
+  });
+});
+
+app.get('/api/purchased', (req, res) => {
+  const openid = req.headers.authorization;
+  if (!openid) {
+    return res.json({ code: 1, message: '未登录' });
+  }
+  
+  getOrCreateUser(openid);
+  
+  const purchased = db.prepare(`
+    SELECT p.*, pur.purchased_at, pur.purchase_method 
+    FROM purchased pur 
+    JOIN prompts p ON pur.prompt_id = p.id 
+    WHERE pur.user_openid = ? 
+    ORDER BY pur.purchased_at DESC
+  `).all(openid).map(p => ({
+    ...p,
+    tags: JSON.parse(p.tags || '[]'),
+    images: JSON.parse(p.images || '[]')
+  }));
+  
+  res.json({
+    code: 0,
+    data: purchased
+  });
+});
+
+app.get('/api/favorites', (req, res) => {
+  const openid = req.headers.authorization;
+  const { folderId = 'default' } = req.query;
+  
+  if (!openid) {
+    return res.json({ code: 1, message: '未登录' });
+  }
+  
+  getOrCreateUser(openid);
+  
+  const favorites = db.prepare(`
+    SELECT p.*, f.favorited_at 
+    FROM favorites f 
+    JOIN prompts p ON f.prompt_id = p.id 
+    WHERE f.user_openid = ? AND f.folder_id = ?
+    ORDER BY f.favorited_at DESC
+  `).all(openid, folderId).map(p => ({
+    ...p,
+    tags: JSON.parse(p.tags || '[]'),
+    images: JSON.parse(p.images || '[]')
+  }));
+  
+  res.json({
+    code: 0,
+    data: favorites
+  });
+});
+
+app.get('/api/favorites/folders', (req, res) => {
+  const openid = req.headers.authorization;
+  if (!openid) {
+    return res.json({ code: 1, message: '未登录' });
+  }
+  
+  getOrCreateUser(openid);
+  
+  const folders = db.prepare('SELECT * FROM favorite_folders WHERE user_openid = ? ORDER BY created_at').all(openid);
+  
+  res.json({
+    code: 0,
+    data: folders
+  });
+});
+
+app.post('/api/favorites/toggle', (req, res) => {
+  const openid = req.headers.authorization;
+  const { promptId, folderId = 'default' } = req.body;
+  
+  if (!openid) {
+    return res.json({ code: 1, message: '未登录' });
+  }
+  
+  getOrCreateUser(openid);
+  
+  const existing = db.prepare('SELECT * FROM favorites WHERE user_openid = ? AND prompt_id = ?').get(openid, promptId);
+  
+  if (existing) {
+    db.prepare('DELETE FROM favorites WHERE user_openid = ? AND prompt_id = ?').run(openid, promptId);
+    db.prepare('UPDATE favorite_folders SET count = count - 1 WHERE user_openid = ? AND id = ?').run(openid, existing.folder_id);
+    res.json({ code: 0, data: { isFavorited: false } });
+  } else {
+    db.prepare('INSERT INTO favorites (user_openid, prompt_id, folder_id) VALUES (?, ?, ?)').run(openid, promptId, folderId);
+    db.prepare('UPDATE favorite_folders SET count = count + 1 WHERE user_openid = ? AND id = ?').run(openid, folderId);
+    res.json({ code: 0, data: { isFavorited: true } });
+  }
+});
+
+app.post('/api/favorites/folder', (req, res) => {
+  const openid = req.headers.authorization;
+  const { name } = req.body;
+  
+  if (!openid) {
+    return res.json({ code: 1, message: '未登录' });
+  }
+  
+  getOrCreateUser(openid);
+  
+  const folderId = 'folder_' + Date.now();
+  db.prepare('INSERT INTO favorite_folders (id, user_openid, name, count) VALUES (?, ?, ?, 0)').run(folderId, openid, name);
+  
+  const folder = db.prepare('SELECT * FROM favorite_folders WHERE id = ?').get(folderId);
+  res.json({ code: 0, data: folder });
+});
+
+app.put('/api/favorites/folder/:id', (req, res) => {
+  const openid = req.headers.authorization;
+  const { id } = req.params;
+  const { name } = req.body;
+  
+  if (!openid) {
+    return res.json({ code: 1, message: '未登录' });
+  }
+  
+  db.prepare('UPDATE favorite_folders SET name = ? WHERE id = ? AND user_openid = ?').run(name, id, openid);
+  const folder = db.prepare('SELECT * FROM favorite_folders WHERE id = ?').get(id);
+  
+  res.json({ code: 0, data: folder });
+});
+
+app.delete('/api/favorites/folder/:id', (req, res) => {
+  const openid = req.headers.authorization;
+  const { id } = req.params;
+  
+  if (!openid) {
+    return res.json({ code: 1, message: '未登录' });
+  }
+  
+  if (id === 'default') {
+    return res.json({ code: 1, message: '默认收藏夹不能删除' });
+  }
+  
+  const folder = db.prepare('SELECT * FROM favorite_folders WHERE id = ? AND user_openid = ?').get(id, openid);
+  if (!folder) {
+    return res.json({ code: 1, message: '收藏夹不存在' });
+  }
+  
+  db.prepare('UPDATE favorites SET folder_id = ? WHERE user_openid = ? AND folder_id = ?').run('default', openid, id);
+  db.prepare('UPDATE favorite_folders SET count = count + ? WHERE id = ? AND user_openid = ?').run(folder.count, 'default', openid);
+  db.prepare('DELETE FROM favorite_folders WHERE id = ? AND user_openid = ?').run(id, openid);
+  
+  res.json({ code: 0, data: { success: true } });
+});
+
+app.get('/api/checkin/status', (req, res) => {
+  const openid = req.headers.authorization;
+  if (!openid) {
+    return res.json({ code: 1, message: '未登录' });
+  }
+  
+  getOrCreateUser(openid);
+  
+  const today = getToday();
+  const todayCheckin = db.prepare('SELECT * FROM checkins WHERE user_openid = ? AND checkin_date = ?').get(openid, today);
+  
+  const weekCheckins = db.prepare(`
+    SELECT checkin_date FROM checkins 
+    WHERE user_openid = ? AND checkin_date >= date("now", "weekday 0", "-6 days")
+    ORDER BY checkin_date
+  `).all(openid).map(c => c.checkin_date);
+  
+  let streak = 0;
+  let checkDate = new Date();
+  while (true) {
+    const dateStr = checkDate.toISOString().split('T')[0];
+    const checked = db.prepare('SELECT 1 FROM checkins WHERE user_openid = ? AND checkin_date = ?').get(openid, dateStr);
+    if (checked) {
+      streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  
+  res.json({
+    code: 0,
+    data: {
+      canCheckin: !todayCheckin,
+      streak,
+      weekCheckins,
+      todayChecked: !!todayCheckin
+    }
+  });
+});
+
+app.post('/api/checkin', (req, res) => {
+  const openid = req.headers.authorization;
+  if (!openid) {
+    return res.json({ code: 1, message: '未登录' });
+  }
+  
+  getOrCreateUser(openid);
+  
+  const today = getToday();
+  const existing = db.prepare('SELECT * FROM checkins WHERE user_openid = ? AND checkin_date = ?').get(openid, today);
+  
+  if (existing) {
+    return res.json({ code: 1, message: '今日已签到' });
+  }
+  
+  let streak = 1;
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  const yCheckin = db.prepare('SELECT * FROM checkins WHERE user_openid = ? AND checkin_date = ?').get(openid, yesterdayStr);
+  if (yCheckin) {
+    streak = yCheckin.streak + 1;
+  }
+  
+  const weekCheckins = db.prepare(`
+    SELECT checkin_date FROM checkins 
+    WHERE user_openid = ? AND checkin_date >= date("now", "weekday 0", "-6 days")
+  `).all(openid);
+  
+  let reward = 1;
+  if (weekCheckins.length >= 6) {
+    reward = 3;
+  }
+  
+  db.prepare('INSERT INTO checkins (user_openid, checkin_date, streak, reward) VALUES (?, ?, ?, ?)').run(openid, today, streak, reward);
+  
+  const newCredits = updateUserCredits(openid, reward, 'earn', '签到', `连续签到${streak}天`);
+  
+  res.json({
+    code: 0,
+    data: {
+      success: true,
+      reward,
+      streak,
+      newCredits
+    }
+  });
+});
+
+app.get('/api/ad/status', (req, res) => {
+  const openid = req.headers.authorization;
+  if (!openid) {
+    return res.json({ code: 1, message: '未登录' });
+  }
+  
+  getOrCreateUser(openid);
+  
+  const today = getToday();
+  const watchData = db.prepare('SELECT * FROM ad_watches WHERE user_openid = ? AND watch_date = ?').get(openid, today);
+  
+  res.json({
+    code: 0,
+    data: {
+      count: watchData ? watchData.count : 0,
+      maxCount: 10,
+      canWatch: !watchData || watchData.count < 10
+    }
+  });
+});
+
+app.post('/api/ad/watch', (req, res) => {
+  const openid = req.headers.authorization;
+  if (!openid) {
+    return res.json({ code: 1, message: '未登录' });
+  }
+  
+  getOrCreateUser(openid);
+  
+  const today = getToday();
+  const watchData = db.prepare('SELECT * FROM ad_watches WHERE user_openid = ? AND watch_date = ?').get(openid, today);
+  
+  if (watchData && watchData.count >= 10) {
+    return res.json({ code: 1, message: '今日广告次数已用完' });
+  }
+  
+  if (watchData) {
+    db.prepare('UPDATE ad_watches SET count = count + 1 WHERE id = ?').run(watchData.id);
+  } else {
+    db.prepare('INSERT INTO ad_watches (user_openid, watch_date, count) VALUES (?, ?, 1)').run(openid, today);
+  }
+  
+  const newCredits = updateUserCredits(openid, 1, 'earn', '观看广告', `第${(watchData ? watchData.count : 0) + 1}次`);
+  const remaining = 10 - ((watchData ? watchData.count : 0) + 1);
+  
+  res.json({
+    code: 0,
+    data: {
+      success: true,
+      newCredits,
+      remaining
+    }
+  });
+});
+
+app.get('/api/credits/log', (req, res) => {
+  const openid = req.headers.authorization;
+  const { page = 1, pageSize = 20 } = req.query;
+  
+  if (!openid) {
+    return res.json({ code: 1, message: '未登录' });
+  }
+  
+  getOrCreateUser(openid);
+  
+  const offset = (page - 1) * pageSize;
+  const logs = db.prepare(`
+    SELECT * FROM credits_log 
+    WHERE user_openid = ? 
+    ORDER BY created_at DESC 
+    LIMIT ? OFFSET ?
+  `).all(openid, parseInt(pageSize), parseInt(offset));
+  
+  const total = db.prepare('SELECT COUNT(*) as total FROM credits_log WHERE user_openid = ?').get(openid).total;
+  
+  res.json({
+    code: 0,
+    data: {
+      list: logs,
+      total,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize)
+    }
+  });
+});
+
+app.post('/api/share/reward', (req, res) => {
+  const openid = req.headers.authorization;
+  const { friendOpenid } = req.body;
+  
+  if (!openid || !friendOpenid) {
+    return res.json({ code: 1, message: '参数错误' });
+  }
+  
+  const friend = getUserByOpenid(friendOpenid);
+  if (!friend) {
+    return res.json({ code: 1, message: '好友不存在' });
+  }
+  
+  if (friend.inviter_openid) {
+    return res.json({ code: 1, message: '该好友已被邀请过' });
+  }
+  
+  const today = getToday();
+  const shareData = db.prepare('SELECT * FROM share_rewards WHERE user_openid = ? AND reward_date = ?').get(openid, today);
+  
+  if (shareData && shareData.count >= 10) {
+    return res.json({ code: 1, message: '今日分享奖励已达上限' });
+  }
+  
+  db.prepare('UPDATE users SET inviter_openid = ? WHERE openid = ?').run(openid, friendOpenid);
+  
+  if (shareData) {
+    db.prepare('UPDATE share_rewards SET count = count + 1 WHERE id = ?').run(shareData.id);
+  } else {
+    db.prepare('INSERT INTO share_rewards (user_openid, reward_date, count) VALUES (?, ?, 1)').run(openid, today);
+  }
+  
+  const newCredits = updateUserCredits(openid, 1, 'earn', '邀请好友', `好友ID: ${friendOpenid}`);
+  
+  res.json({
+    code: 0,
+    data: {
+      success: true,
+      newCredits
+    }
+  });
+});
+
+app.post('/api/feedback', (req, res) => {
+  const openid = req.headers.authorization;
+  const { content } = req.body;
+  
+  if (!openid || !content) {
+    return res.json({ code: 1, message: '参数错误' });
+  }
+  
+  getOrCreateUser(openid);
+  
+  db.prepare('INSERT INTO feedback (user_openid, content) VALUES (?, ?)').run(openid, content);
+  
+  res.json({
+    code: 0,
+    data: { success: true }
+  });
+});
+
+app.get('/api/admin/stats', (req, res) => {
+  const totalUsers = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
+  const todayUsers = db.prepare('SELECT COUNT(*) as count FROM users WHERE created_at >= date("now")').get().count;
+  const totalPrompts = db.prepare('SELECT COUNT(*) as count FROM prompts WHERE status = 1').get().count;
+  const todayCopies = db.prepare('SELECT COUNT(*) as count FROM purchased WHERE DATE(purchased_at) = date("now")').get().count;
+  const totalCopies = db.prepare('SELECT SUM(copy_count) as total FROM prompts').get().total || 0;
+  const totalAdUnlocks = db.prepare('SELECT SUM(ad_unlock_count) as total FROM prompts').get().total || 0;
+  
+  res.json({
+    code: 0,
+    data: {
+      totalUsers,
+      todayUsers,
+      totalPrompts,
+      todayCopies,
+      totalCopies,
+      totalAdUnlocks
+    }
+  });
+});
+
+app.get('/api/admin/users', (req, res) => {
+  const { page = 1, pageSize = 20, keyword = '' } = req.query;
+  const offset = (page - 1) * pageSize;
+  
+  let sql = 'SELECT * FROM users';
+  let countSql = 'SELECT COUNT(*) as total FROM users';
+  let params = [];
+  
+  if (keyword) {
+    sql += ' WHERE nickname LIKE ? OR openid LIKE ?';
+    countSql += ' WHERE nickname LIKE ? OR openid LIKE ?';
+    const kw = '%' + keyword + '%';
+    params.push(kw, kw);
+  }
+  
+  sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+  const countParams = [...params];
+  params.push(parseInt(pageSize), parseInt(offset));
+  
+  const users = db.prepare(sql).all(...params);
+  const total = db.prepare(countSql).get(...countParams).total;
+  
+  res.json({
+    code: 0,
+    data: {
+      list: users,
+      total,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize)
+    }
+  });
+});
+
+app.get('/api/admin/prompts', (req, res) => {
+  const { page = 1, pageSize = 20, keyword = '', category = '' } = req.query;
+  const offset = (page - 1) * pageSize;
+  
+  let sql = 'SELECT * FROM prompts WHERE 1=1';
+  let countSql = 'SELECT COUNT(*) as total FROM prompts WHERE 1=1';
+  let params = [];
+  
+  if (keyword) {
+    sql += ' AND title LIKE ?';
+    countSql += ' AND title LIKE ?';
+    params.push('%' + keyword + '%');
+  }
+  
+  if (category) {
+    sql += ' AND category = ?';
+    countSql += ' AND category = ?';
+    params.push(category);
+  }
+  
+  sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+  const countParams = [...params];
+  params.push(parseInt(pageSize), parseInt(offset));
+  
+  const prompts = db.prepare(sql).all(...params).map(p => ({
+    ...p,
+    tags: JSON.parse(p.tags || '[]'),
+    images: JSON.parse(p.images || '[]')
+  }));
+  const total = db.prepare(countSql).get(...countParams).total;
+  
+  res.json({
+    code: 0,
+    data: {
+      list: prompts,
+      total,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize)
+    }
+  });
+});
+
+app.post('/api/admin/prompts', (req, res) => {
+  const { title, description, content, category, tags = [], cover, images = [], is_top = 0, weight = 1, is_recommended = 0 } = req.body;
+  
+  if (!title || !content) {
+    return res.json({ code: 1, message: '标题和内容不能为空' });
+  }
+  
+  const stmt = db.prepare(`
+    INSERT INTO prompts (title, description, content, category, tags, cover, images, is_top, weight, is_recommended)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  
+  const result = stmt.run(
+    title,
+    description || '',
+    content,
+    category || '',
+    JSON.stringify(tags),
+    cover || '',
+    JSON.stringify(images),
+    is_top ? 1 : 0,
+    weight,
+    is_recommended ? 1 : 0
+  );
+  
+  res.json({
+    code: 0,
+    data: { id: result.lastInsertRowid }
+  });
+});
+
+app.put('/api/admin/prompts/:id', (req, res) => {
+  const { id } = req.params;
+  const { title, description, content, category, tags, cover, images, is_top, weight, is_recommended, status } = req.body;
+  
+  const existing = db.prepare('SELECT * FROM prompts WHERE id = ?').get(id);
+  if (!existing) {
+    return res.json({ code: 1, message: '指令不存在' });
+  }
+  
+  const fields = [];
+  const values = [];
+  
+  if (title !== undefined) { fields.push('title = ?'); values.push(title); }
+  if (description !== undefined) { fields.push('description = ?'); values.push(description); }
+  if (content !== undefined) { fields.push('content = ?'); values.push(content); }
+  if (category !== undefined) { fields.push('category = ?'); values.push(category); }
+  if (tags !== undefined) { fields.push('tags = ?'); values.push(JSON.stringify(tags)); }
+  if (cover !== undefined) { fields.push('cover = ?'); values.push(cover); }
+  if (images !== undefined) { fields.push('images = ?'); values.push(JSON.stringify(images)); }
+  if (is_top !== undefined) { fields.push('is_top = ?'); values.push(is_top ? 1 : 0); }
+  if (weight !== undefined) { fields.push('weight = ?'); values.push(weight); }
+  if (is_recommended !== undefined) { fields.push('is_recommended = ?'); values.push(is_recommended ? 1 : 0); }
+  if (status !== undefined) { fields.push('status = ?'); values.push(status); }
+  
+  fields.push('updated_at = CURRENT_TIMESTAMP');
+  values.push(id);
+  
+  db.prepare(`UPDATE prompts SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  
+  res.json({
+    code: 0,
+    data: { success: true }
+  });
+});
+
+app.delete('/api/admin/prompts/:id', (req, res) => {
+  const { id } = req.params;
+  db.prepare('DELETE FROM prompts WHERE id = ?').run(id);
+  res.json({ code: 0, data: { success: true } });
+});
+
+app.get('/api/admin/feedback', (req, res) => {
+  const { page = 1, pageSize = 20 } = req.query;
+  const offset = (page - 1) * pageSize;
+  
+  const feedback = db.prepare(`
+    SELECT f.*, u.nickname 
+    FROM feedback f 
+    LEFT JOIN users u ON f.user_openid = u.openid
+    ORDER BY f.created_at DESC 
+    LIMIT ? OFFSET ?
+  `).all(parseInt(pageSize), parseInt(offset));
+  
+  const total = db.prepare('SELECT COUNT(*) as total FROM feedback').get().total;
+  
+  res.json({
+    code: 0,
+    data: {
+      list: feedback,
+      total,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize)
+    }
+  });
+});
+
+app.post('/api/admin/login', (req, res) => {
+  const { username, password } = req.body;
+  
+  // Vercel serverless 模式：用环境变量验证（不走数据库）
+  const adminUser = process.env.ADMIN_USER || 'admin';
+  const adminPass = process.env.ADMIN_PASS || 'admin123';
+  
+  if (username !== adminUser || password !== adminPass) {
+    return res.json({ code: 1, message: '用户名或密码错误' });
+  }
+  
+  res.json({
+    code: 0,
+    data: {
+      token: 'admin_token_' + Date.now(),
+      user: {
+        id: 1,
+        username: adminUser
+      }
+    }
+  });
+});
+
+(async () => {
+  try {
+    await initDb();
+    if (process.env.VERCEL) {
+      // Vercel serverless 模式
+      module.exports = app;
+    } else {
+      app.listen(PORT, () => {
+        console.log(`服务器运行在 http://localhost:${PORT}`);
+        console.log(`管理后台: http://localhost:${PORT}/admin`);
+      });
+    }
+  } catch (err) {
+    console.error('数据库初始化失败:', err);
+    process.exit(1);
+  }
+})();
