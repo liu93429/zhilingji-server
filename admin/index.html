@@ -1822,9 +1822,29 @@
 
       document.getElementById('credits-detail-name').textContent = nickName;
       document.getElementById('credits-detail-balance').textContent = credits + ' 积分';
-      document.getElementById('credits-detail-list').innerHTML = '<p class="text-sm text-gray-400 text-center py-8">暂无积分记录（后端暂未提供此接口）</p>';
+      
+      const listEl = document.getElementById('credits-detail-list');
+      listEl.innerHTML = '<p class="text-sm text-gray-400 text-center py-8">加载中...</p>';
       document.getElementById('credits-detail-modal').classList.remove('hidden');
       lucide.createIcons();
+      
+      // 从API获取积分明细
+      apiGet('/admin/users/' + userId + '/credits-log').then(res => {
+        if (res.code === 0 && res.data.list && res.data.list.length > 0) {
+          listEl.innerHTML = res.data.list.map(log => {
+            const amt = log.amount || 0;
+            const isAdd = amt > 0;
+            return '<div class="flex items-center justify-between py-2 border-b border-gray-50">' +
+              '<div><p class="text-sm text-gray-700">' + (log.reason || log.type || '') + '</p>' +
+              '<p class="text-xs text-gray-400">' + (log.created_at || '') + '</p></div>' +
+              '<span class="text-sm font-semibold ' + (isAdd ? 'text-green-500' : 'text-red-400') + '">' + (isAdd ? '+' : '') + amt + '</span></div>';
+          }).join('');
+        } else {
+          listEl.innerHTML = '<p class="text-sm text-gray-400 text-center py-8">暂无积分记录</p>';
+        }
+      }).catch(() => {
+        listEl.innerHTML = '<p class="text-sm text-red-400 text-center py-8">加载失败</p>';
+      });
     }
 
     function closeCreditsDetailModal() {
@@ -1850,11 +1870,30 @@
       editingUserId = null;
     }
 
-    // 积分调整（后端暂无此 API，前端本地更新缓存）
-    function applyCreditsChange() {
+    // 积分调整
+    async function applyCreditsChange() {
       if (!editingUserId) return;
-      showToast('积分调整功能需要后端支持', 'warning');
-      closeCreditsModal();
+      const action = document.getElementById('credits-action').value;
+      const amount = parseInt(document.getElementById('credits-amount').value) || 0;
+      const reason = document.getElementById('credits-reason').value.trim() || (action === 'add' ? '后台赠送积分' : '后台扣减积分');
+      
+      if (amount <= 0) { showToast('请输入有效积分数值', 'warning'); return; }
+      
+      try {
+        const res = await apiPost('/admin/users/' + editingUserId + '/credits', {
+          amount: action === 'add' ? amount : -amount,
+          reason: reason
+        });
+        if (res.code === 0) {
+          showToast('积分调整成功', 'success');
+          closeCreditsModal();
+          renderUsers();
+        } else {
+          showToast(res.message || '操作失败', 'error');
+        }
+      } catch(err) {
+        showToast('操作失败: ' + err.message, 'error');
+      }
     }
 
     // ==========================================

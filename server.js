@@ -113,15 +113,33 @@ app.post('/api/admin/users/sync', (req, res) => {
   }
 });
 
-// 后台赠送积分
+// 后台赠送/扣减积分
 app.post('/api/admin/users/:id/credits', (req, res) => {
   const { amount, reason } = req.body;
-  if (typeof amount !== 'number') return res.json({ code: 1, message: '积分数值无效' });
+  if (typeof amount !== 'number' || amount === 0) return res.json({ code: 1, message: '积分数值无效' });
   
   try {
-    db.prepare('UPDATE users SET credits = credits + ?, total_earned = total_earned + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(amount > 0 ? amount : 0, amount > 0 ? amount : 0, req.params.id);
+    if (amount > 0) {
+      db.prepare('UPDATE users SET credits = credits + ?, total_earned = total_earned + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(amount, amount, req.params.id);
+    } else {
+      db.prepare('UPDATE users SET credits = MAX(0, credits + ?), total_spent = total_spent + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(amount, Math.abs(amount), req.params.id);
+    }
+    // 记录积分变动
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+    addCreditsLog(user.openid, 'admin_' + (amount > 0 ? 'add' : 'sub'), amount, reason || (amount > 0 ? '后台赠送' : '后台扣减'), '', user.credits);
     res.json({ code: 0, data: user });
+  } catch(e) {
+    res.json({ code: 1, message: '操作失败: ' + e.message });
+  }
+});
+
+// 获取用户积分明细
+app.get('/api/admin/users/:id/credits-log', (req, res) => {
+  try {
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+    if (!user) return res.json({ code: 1, message: '用户不存在' });
+    const logs = db.prepare('SELECT * FROM credits_log WHERE user_openid = ? ORDER BY created_at DESC LIMIT 50').all(user.openid);
+    res.json({ code: 0, data: { list: logs } });
   } catch(e) {
     res.json({ code: 1, message: '操作失败: ' + e.message });
   }
