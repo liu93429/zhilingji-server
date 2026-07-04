@@ -917,9 +917,11 @@ app.get('/api/admin/feedback', (req, res) => {
 app.post('/api/admin/login', (req, res) => {
   const { username, password } = req.body;
   
-  const admin = db.prepare('SELECT * FROM admin_users WHERE username = ? AND password = ?').get(username, password);
+  // Vercel serverless 模式：用环境变量验证（不走数据库）
+  const adminUser = process.env.ADMIN_USER || 'admin';
+  const adminPass = process.env.ADMIN_PASS || 'admin123';
   
-  if (!admin) {
+  if (username !== adminUser || password !== adminPass) {
     return res.json({ code: 1, message: '用户名或密码错误' });
   }
   
@@ -928,8 +930,8 @@ app.post('/api/admin/login', (req, res) => {
     data: {
       token: 'admin_token_' + Date.now(),
       user: {
-        id: admin.id,
-        username: admin.username
+        id: 1,
+        username: adminUser
       }
     }
   });
@@ -938,15 +940,10 @@ app.post('/api/admin/login', (req, res) => {
 (async () => {
   try {
     await initDb();
-    if (process.env.VERCEL) {
-      // Vercel serverless 模式
-      module.exports = app;
-    } else {
-      app.listen(PORT, () => {
-        console.log(`服务器运行在 http://localhost:${PORT}`);
-        console.log(`管理后台: http://localhost:${PORT}/admin`);
-      });
-    }
+    app.listen(PORT, () => {
+      console.log(`服务器运行在 http://localhost:${PORT}`);
+      console.log(`管理后台: http://localhost:${PORT}/admin`);
+    });
   } catch (err) {
     console.error('数据库初始化失败:', err);
     process.exit(1);
