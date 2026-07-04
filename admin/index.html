@@ -1157,16 +1157,12 @@
         headers: authHeaders(),
         body: JSON.stringify(body)
       });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error('HTTP ' + res.status + ': ' + text.substring(0, 200));
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch(e) {
+        throw new Error('服务器返回非JSON响应(status:' + res.status + '): ' + text.substring(0, 200));
       }
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('text/html')) {
-        const text = await res.text();
-        throw new Error('返回了HTML页面而非JSON: ' + text.substring(0, 200));
-      }
-      return res.json();
     }
 
     async function apiPut(url, body) {
