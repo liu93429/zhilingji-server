@@ -92,6 +92,27 @@ app.post('/api/user/login', (req, res) => {
   });
 });
 
+// 小程序同步用户到后台
+app.post('/api/admin/users/sync', (req, res) => {
+  const { openid, nickName, avatarUrl } = req.body;
+  if (!openid) return res.json({ code: 1, message: 'openid不能为空' });
+  
+  try {
+    db.prepare(`
+      INSERT INTO users (openid, nickname, avatar, credits, total_earned, total_spent, created_at, updated_at)
+      VALUES (?, ?, ?, 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT(openid) DO UPDATE SET
+        nickname = COALESCE(?, nickname),
+        avatar = COALESCE(?, avatar),
+        updated_at = CURRENT_TIMESTAMP
+    `).run(openid, nickName || '', avatarUrl || '', nickName || '', avatarUrl || '');
+    
+    res.json({ code: 0, message: '同步成功' });
+  } catch(e) {
+    res.json({ code: 1, message: '同步失败: ' + e.message });
+  }
+});
+
 app.get('/api/user/info', (req, res) => {
   const openid = req.headers.authorization;
   if (!openid) {
