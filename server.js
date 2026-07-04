@@ -113,6 +113,20 @@ app.post('/api/admin/users/sync', (req, res) => {
   }
 });
 
+// 后台赠送积分
+app.post('/api/admin/users/:id/credits', (req, res) => {
+  const { amount, reason } = req.body;
+  if (typeof amount !== 'number') return res.json({ code: 1, message: '积分数值无效' });
+  
+  try {
+    db.prepare('UPDATE users SET credits = credits + ?, total_earned = total_earned + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(amount > 0 ? amount : 0, amount > 0 ? amount : 0, req.params.id);
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+    res.json({ code: 0, data: user });
+  } catch(e) {
+    res.json({ code: 1, message: '操作失败: ' + e.message });
+  }
+});
+
 app.get('/api/user/info', (req, res) => {
   const openid = req.headers.authorization;
   if (!openid) {
@@ -124,6 +138,55 @@ app.get('/api/user/info', (req, res) => {
     code: 0,
     data: user
   });
+});
+
+// 获取用户积分
+app.get('/api/user/credits', (req, res) => {
+  const openid = req.headers.authorization;
+  if (!openid) return res.json({ code: 1, message: '未登录' });
+  const user = getOrCreateUser(openid);
+  res.json({ code: 0, data: { credits: user.credits || 0 } });
+});
+
+// 增加积分（签到、奖励等）
+app.post('/api/user/credits/add', (req, res) => {
+  const openid = req.headers.authorization;
+  if (!openid) return res.json({ code: 1, message: '未登录' });
+  const { amount, reason } = req.body;
+  if (typeof amount !== 'number' || amount <= 0) return res.json({ code: 1, message: '积分数值无效' });
+  
+  db.prepare('UPDATE users SET credits = credits + ?, total_earned = total_earned + ?, updated_at = CURRENT_TIMESTAMP WHERE openid = ?').run(amount, amount, openid);
+  const user = getOrCreateUser(openid);
+  res.json({ code: 0, data: { credits: user.credits } });
+});
+
+// 消耗积分
+app.post('/api/user/credits/consume', (req, res) => {
+  const openid = req.headers.authorization;
+  if (!openid) return res.json({ code: 1, message: '未登录' });
+  const { amount, reason } = req.body;
+  if (typeof amount !== 'number' || amount <= 0) return res.json({ code: 1, message: '积分数值无效' });
+  
+  const user = getOrCreateUser(openid);
+  if (user.credits < amount) return res.json({ code: 1, message: '积分不足' });
+  
+  db.prepare('UPDATE users SET credits = credits - ?, total_spent = total_spent + ?, updated_at = CURRENT_TIMESTAMP WHERE openid = ?').run(amount, amount, openid);
+  res.json({ code: 0, data: { credits: user.credits - amount } });
+});
+
+// 注册赠送积分
+app.post('/api/user/credits/register', (req, res) => {
+  const openid = req.headers.authorization;
+  if (!openid) return res.json({ code: 1, message: '未登录' });
+  
+  const user = getOrCreateUser(openid);
+  // 检查是否已经领取过注册奖励
+  const hasBonus = db.prepare("SELECT * FROM credits_log WHERE user_openid = ? AND type = 'register'").get(openid);
+  if (hasBonus) return res.json({ code: 0, data: { credits: user.credits, given: false }, message: '已领取过注册奖励' });
+  
+  db.prepare('UPDATE users SET credits = credits + 3, total_earned = total_earned + 3, updated_at = CURRENT_TIMESTAMP WHERE openid = ?').run(openid);
+  addCreditsLog(openid, 'register', 3, '新注册赠送积分', '', 3);
+  res.json({ code: 0, data: { credits: user.credits + 3, given: true } });
 });
 
 app.put('/api/user/info', (req, res) => {
