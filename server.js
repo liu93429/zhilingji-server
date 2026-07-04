@@ -940,16 +940,10 @@ app.post('/api/admin/login', (req, res) => {
 (async () => {
   try {
     await initDb();
-    if (process.env.VERCEL) {
-      // Vercel serverless: 通过全局变量导出 app
-      module.exports.app = app;
-      module.exports._appReady = true;
-    } else {
-      app.listen(PORT, () => {
-        console.log(`服务器运行在 http://localhost:${PORT}`);
-        console.log(`管理后台: http://localhost:${PORT}/admin`);
-      });
-    }
+    app.listen(PORT, () => {
+      console.log(`服务器运行在 http://localhost:${PORT}`);
+      console.log(`管理后台: http://localhost:${PORT}/admin`);
+    });
   } catch (err) {
     console.error('数据库初始化失败:', err);
     process.exit(1);
