@@ -175,6 +175,8 @@ app.post('/api/user/credits/add', (req, res) => {
   
   db.prepare('UPDATE users SET credits = credits + ?, total_earned = total_earned + ?, updated_at = CURRENT_TIMESTAMP WHERE openid = ?').run(amount, amount, openid);
   const user = getOrCreateUser(openid);
+  // 写入积分明细日志
+  addCreditsLog(openid, 'earn', amount, reason || '积分增加', '', user.credits);
   res.json({ code: 0, data: { credits: user.credits } });
 });
 
@@ -189,7 +191,10 @@ app.post('/api/user/credits/consume', (req, res) => {
   if (user.credits < amount) return res.json({ code: 1, message: '积分不足' });
   
   db.prepare('UPDATE users SET credits = credits - ?, total_spent = total_spent + ?, updated_at = CURRENT_TIMESTAMP WHERE openid = ?').run(amount, amount, openid);
-  res.json({ code: 0, data: { credits: user.credits - amount } });
+  const updatedUser = getOrCreateUser(openid);
+  // 写入积分明细日志
+  addCreditsLog(openid, 'spend', amount, reason || '积分消耗', '', updatedUser.credits);
+  res.json({ code: 0, data: { credits: updatedUser.credits } });
 });
 
 // 注册赠送积分
@@ -1037,6 +1042,111 @@ app.post('/api/admin/login', (req, res) => {
       }
     }
   });
+});
+
+// ==========================================
+// Banner 管理 API
+// ==========================================
+
+// 公开接口：获取所有上架的 Banner（小程序前端调用）
+app.get('/api/banners', (req, res) => {
+  const banners = db.prepare('SELECT * FROM banners WHERE status = ? ORDER BY sort ASC, id ASC').all('active');
+  res.json({
+    code: 0,
+    data: {
+      list: banners.map(b => ({
+        id: b.id,
+        title: b.title,
+        subtitle: b.subtitle || '',
+        image: b.image || '',
+        linkType: b.link_type || 'none',
+        linkParam: b.link_param || '',
+        gradientStart: b.gradient_start || '#FF6B9D',
+        gradientEnd: b.gradient_end || '#C4B5FD',
+        sort: b.sort || 0,
+        status: b.status
+      }))
+    }
+  });
+});
+
+// 管理端：获取所有 Banner（含下架的）
+app.get('/api/admin/banners', (req, res) => {
+  const banners = db.prepare('SELECT * FROM banners ORDER BY sort ASC, id ASC').all();
+  res.json({
+    code: 0,
+    data: {
+      list: banners.map(b => ({
+        id: b.id,
+        title: b.title,
+        subtitle: b.subtitle || '',
+        image: b.image || '',
+        linkType: b.link_type || 'none',
+        linkParam: b.link_param || '',
+        gradientStart: b.gradient_start || '#FF6B9D',
+        gradientEnd: b.gradient_end || '#C4B5FD',
+        sort: b.sort || 0,
+        status: b.status,
+        created_at: b.created_at
+      }))
+    }
+  });
+});
+
+// 管理端：新增 Banner
+app.post('/api/admin/banners', (req, res) => {
+  const { title, subtitle = '', image = '', linkType = 'none', linkParam = '', gradientStart = '#FF6B9D', gradientEnd = '#C4B5FD', sort = 0 } = req.body;
+  if (!title) {
+    return res.json({ code: 1, message: '请输入 Banner 标题' });
+  }
+  const result = db.prepare(
+    'INSERT INTO banners (title, subtitle, image, link_type, link_param, gradient_start, gradient_end, sort, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(title, subtitle, image, linkType, linkParam, gradientStart, gradientEnd, parseInt(sort) || 0, 'active');
+  res.json({ code: 0, data: { id: result.lastInsertRowid } });
+});
+
+// 管理端：编辑 Banner
+app.put('/api/admin/banners/:id', (req, res) => {
+  const { id } = req.params;
+  const { title, subtitle, image, linkType, linkParam, gradientStart, gradientEnd, sort, status } = req.body;
+  const existing = db.prepare('SELECT * FROM banners WHERE id = ?').get(id);
+  if (!existing) {
+    return res.json({ code: 1, message: 'Banner 不存在' });
+  }
+  const fields = [];
+  const values = [];
+  if (title !== undefined) { fields.push('title = ?'); values.push(title); }
+  if (subtitle !== undefined) { fields.push('subtitle = ?'); values.push(subtitle); }
+  if (image !== undefined) { fields.push('image = ?'); values.push(image); }
+  if (linkType !== undefined) { fields.push('link_type = ?'); values.push(linkType); }
+  if (linkParam !== undefined) { fields.push('link_param = ?'); values.push(linkParam); }
+  if (gradientStart !== undefined) { fields.push('gradient_start = ?'); values.push(gradientStart); }
+  if (gradientEnd !== undefined) { fields.push('gradient_end = ?'); values.push(gradientEnd); }
+  if (sort !== undefined) { fields.push('sort = ?'); values.push(parseInt(sort) || 0); }
+  if (status !== undefined) { fields.push('status = ?'); values.push(status); }
+  fields.push('updated_at = CURRENT_TIMESTAMP');
+  values.push(id);
+  db.prepare(`UPDATE banners SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  res.json({ code: 0, data: { success: true } });
+});
+
+// 管理端：切换 Banner 上下架状态
+app.put('/api/admin/banners/:id/toggle', (req, res) => {
+  const { id } = req.params;
+  const existing = db.prepare('SELECT * FROM banners WHERE id = ?').get(id);
+  if (!existing) {
+    return res.json({ code: 1, message: 'Banner 不存在' });
+  }
+  const newStatus = existing.status === 'active' ? 'inactive' : 'active';
+  db.prepare('UPDATE banners SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newStatus, id);
+  res.json({ code: 0, data: { success: true, status: newStatus } });
+});
+
+// 管理端：删除 Banner
+app.delete('/api/admin/banners/:id', (req, res) => {
+  const { id } = req.params;
+  db.prepare('DELETE FROM banners WHERE id = ?').run(id);
+  res.json({ code: 0, data: { success: true } });
 });
 
 (async () => {

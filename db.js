@@ -132,6 +132,21 @@ async function initDatabase() {
       reply TEXT DEFAULT '',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS banners (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      subtitle TEXT DEFAULT '',
+      image TEXT DEFAULT '',
+      link_type TEXT DEFAULT 'none',
+      link_param TEXT DEFAULT '',
+      gradient_start TEXT DEFAULT '#FF6B9D',
+      gradient_end TEXT DEFAULT '#C4B5FD',
+      sort INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'active',
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   const promptCount = prepare('SELECT COUNT(*) as count FROM prompts').get().count;
@@ -265,6 +280,20 @@ async function initDatabase() {
   const adminCount = prepare('SELECT COUNT(*) as count FROM admin_users').get().count;
   if (adminCount === 0) {
     prepare('INSERT INTO admin_users (username, password) VALUES (?, ?)').run('admin', 'admin123');
+  }
+
+  const bannerCount = prepare('SELECT COUNT(*) as count FROM banners').get().count;
+  if (bannerCount === 0) {
+    const seedBanners = [
+      { title: '会员专属权益', subtitle: '解锁更多精品指令与专属特权', image: '', linkType: 'vip', linkParam: '', gradientStart: '#FF6B9D', gradientEnd: '#C4B5FD', sort: 0 },
+      { title: '邀请好友赚积分', subtitle: '每成功邀请一位好友即可获得 +1 积分', image: '', linkType: 'invite', linkParam: '', gradientStart: '#FDA4AF', gradientEnd: '#86E3CE', sort: 1 },
+      { title: '积分获取与使用规则', subtitle: '签到、分享都能赚积分', image: '', linkType: 'credits', linkParam: '', gradientStart: '#C4B5FD', gradientEnd: '#93C5FD', sort: 2 }
+    ];
+    for (const b of seedBanners) {
+      prepare(`INSERT INTO banners (title, subtitle, image, link_type, link_param, gradient_start, gradient_end, sort, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')`).run(
+        b.title, b.subtitle, b.image, b.linkType, b.linkParam, b.gradientStart, b.gradientEnd, b.sort
+      );
+    }
   }
 
   saveDatabase();
