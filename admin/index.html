@@ -1106,14 +1106,9 @@
     let promptCategories = []; // 从指令列表中提取的分类
     let commonTags = ['热门', '时尚', '写真', '古风', '港风', '复古', '水彩', '治愈', '校园', '赛博朋克', '创意', '胶片'];
 
-    // Banner 和操作记录保持本地（后端暂无对应 API）
-    let banners = [
-      { id: 1, title: '会员专属权益', subtitle: '解锁更多精品指令与专属特权', image: '', linkType: 'vip', linkParam: '', gradientStart: '#FF6B9D', gradientEnd: '#C4B5FD', sort: 0, status: 'active' },
-      { id: 2, title: '邀请好友赚积分', subtitle: '每成功邀请一位好友即可获得 +1 积分', image: '', linkType: 'invite', linkParam: '', gradientStart: '#FDA4AF', gradientEnd: '#86E3CE', sort: 1, status: 'active' },
-      { id: 3, title: '积分获取与使用规则', subtitle: '签到、看广告、分享都能赚积分', image: '', linkType: 'credits', linkParam: '', gradientStart: '#C4B5FD', gradientEnd: '#93C5FD', sort: 2, status: 'active' }
-    ];
+    // Banner 从后端 API 加载
+    let banners = [];
     let recentLogs = [];
-    let nextBannerId = 4;
     let nextLogId = 1;
 
     // ==========================================
@@ -2366,14 +2361,27 @@
     }
 
     // ==========================================
-    // Banner 管理（本地管理，后端暂无 API）
+    // Banner 管理（通过后端 API 持久化）
     // ==========================================
     let editingBannerId = null;
     let currentBannerImage = '';
 
-    function renderBanners() {
+    async function renderBanners() {
       const tbody = document.getElementById('banner-table-body');
       if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-400">加载中...</td></tr>';
+      try {
+        const res = await apiGet('/admin/banners');
+        const data = res.data || res;
+        banners = data.list || [];
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-red-400">加载失败：' + (err.message || '网络错误') + '</td></tr>';
+        return;
+      }
+      if (banners.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-400">暂无 Banner，点击右上角添加</td></tr>';
+        return;
+      }
       const sortedBanners = [...banners].sort((a, b) => a.sort - b.sort);
       const typeNames = { none: '不跳转', prompt: '指令详情', vip: '会员权益', invite: '邀请拉新', credits: '积分规则', custom: '自定义' };
       tbody.innerHTML = sortedBanners.map(b =>
@@ -2469,7 +2477,7 @@
       paramWrap.style.display = (type === 'none') ? 'none' : 'block';
     }
 
-    function saveBanner() {
+    async function saveBanner() {
       const title = document.getElementById('banner-form-title').value.trim();
       if (!title) { showToast('请输入 Banner 标题', 'warning'); return; }
       const data = {
@@ -2482,30 +2490,44 @@
         gradientEnd: document.getElementById('banner-form-gradient-end').value,
         sort: parseInt(document.getElementById('banner-form-sort').value) || 0
       };
-      if (editingBannerId) {
-        const idx = banners.findIndex(x => x.id === editingBannerId);
-        if (idx >= 0) { banners[idx] = { ...banners[idx], ...data }; addLog('编辑了Banner「' + title + '」', 'edit'); showToast('Banner已更新', 'success'); }
-      } else {
-        banners.push({ id: nextBannerId++, ...data, status: 'active' });
-        addLog('添加了Banner「' + title + '」', 'add');
-        showToast('Banner已添加', 'success');
+      try {
+        if (editingBannerId) {
+          await apiPut('/admin/banners/' + editingBannerId, data);
+          addLog('编辑了Banner「' + title + '」', 'edit');
+          showToast('Banner已更新', 'success');
+        } else {
+          await apiPost('/admin/banners', data);
+          addLog('添加了Banner「' + title + '」', 'add');
+          showToast('Banner已添加', 'success');
+        }
+        await renderBanners();
+        closeBannerModal();
+      } catch (err) {
+        showToast('保存失败：' + (err.message || '网络错误'), 'error');
       }
-      renderBanners();
-      closeBannerModal();
     }
 
-    function toggleBannerStatus(id) {
-      const b = banners.find(x => x.id === id);
-      if (b) { b.status = b.status === 'active' ? 'inactive' : 'active'; renderBanners(); showToast('Banner状态已更新', 'success'); }
+    async function toggleBannerStatus(id) {
+      try {
+        await apiPut('/admin/banners/' + id + '/toggle', {});
+        await renderBanners();
+        showToast('Banner状态已更新', 'success');
+      } catch (err) {
+        showToast('操作失败：' + (err.message || '网络错误'), 'error');
+      }
     }
 
     function deleteBanner(id) {
       const b = banners.find(x => x.id === id);
-      showConfirm('删除Banner', '确定要删除Banner「' + (b ? b.title : '') + '」吗？', function() {
-        banners = banners.filter(x => x.id !== id);
-        renderBanners();
-        addLog('删除了一个Banner', 'delete');
-        showToast('Banner已删除', 'success');
+      showConfirm('删除Banner', '确定要删除Banner「' + (b ? b.title : '') + '」吗？', async function() {
+        try {
+          await apiDelete('/admin/banners/' + id);
+          await renderBanners();
+          addLog('删除了一个Banner', 'delete');
+          showToast('Banner已删除', 'success');
+        } catch (err) {
+          showToast('删除失败：' + (err.message || '网络错误'), 'error');
+        }
       });
     }
 
