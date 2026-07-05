@@ -1054,18 +1054,24 @@ app.get('/api/banners', (req, res) => {
   res.json({
     code: 0,
     data: {
-      list: banners.map(b => ({
-        id: b.id,
-        title: b.title,
-        subtitle: b.subtitle || '',
-        image: b.image || '',
-        linkType: b.link_type || 'none',
-        linkParam: b.link_param || '',
-        gradientStart: b.gradient_start || '#FF6B9D',
-        gradientEnd: b.gradient_end || '#C4B5FD',
-        sort: b.sort || 0,
-        status: b.status
-      }))
+      list: banners.map(b => {
+        // base64 图片太大（可达数MB），会导致云函数代理超限失败
+        // 公开接口只返回 URL 格式的图片，base64 一律丢弃（banner 用渐变色即可）
+        const img = b.image || '';
+        const safeImage = (img.startsWith('http://') || img.startsWith('https://')) ? img : '';
+        return {
+          id: b.id,
+          title: b.title,
+          subtitle: b.subtitle || '',
+          image: safeImage,
+          linkType: b.link_type || 'none',
+          linkParam: b.link_param || '',
+          gradientStart: b.gradient_start || '#FF6B9D',
+          gradientEnd: b.gradient_end || '#C4B5FD',
+          sort: b.sort || 0,
+          status: b.status
+        };
+      })
     }
   });
 });
