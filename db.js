@@ -14,7 +14,7 @@ let backupTimer = null;
 function initTcb() {
   try {
     const tcb = require('@cloudbase/node-sdk');
-    const envId = process.env.TCB_ENV || '';
+    const envId = process.env.TCB_ENV || 'cloud1-d6gjzpj2l68ef2bce';
     if (!envId) {
       console.log('未配置 TCB_ENV 环境变量，跳过云存储备份');
       return null;
