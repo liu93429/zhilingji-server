@@ -3,7 +3,7 @@ FROM node:18-slim
 WORKDIR /app
 
 COPY package.json ./
-RUN npm install --production
+RUN rm -rf node_modules && npm install --production
 
 COPY . .
 
