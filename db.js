@@ -11,7 +11,6 @@ let tcbApp = null;
 let backupTimer = null;
 let cloudDbFileId = null;
 const BACKUP_CLOUD_PATH = 'backup/data.db';
-const FILEID_PATH = '/tmp/cloud_db_fileid.txt';
 
 // 初始化腾讯云SDK
 function initTcb() {
@@ -21,13 +20,6 @@ function initTcb() {
     if (!envId) return null;
     tcbApp = tcb.init({ env: envId });
     console.log('腾讯云SDK初始化成功，环境: ' + envId);
-    // 尝试从本地文件恢复 fileID
-    try {
-      if (fs.existsSync(FILEID_PATH)) {
-        cloudDbFileId = fs.readFileSync(FILEID_PATH, 'utf8').trim();
-        console.log('从缓存恢复 fileID: ' + cloudDbFileId);
-      }
-    } catch(e) {}
     return tcbApp;
   } catch (e) {
     console.log('腾讯云SDK未安装，跳过云存储备份');
@@ -35,10 +27,46 @@ function initTcb() {
   }
 }
 
+// 从云数据库读取保存的 fileID
+async function loadFileIdFromCloud() {
+  if (!tcbApp) return null;
+  try {
+    const db = tcbApp.database();
+    const res = await db.collection('config').doc('db_backup_fileid').get();
+    if (res.data && res.data.fileId) {
+      return res.data.fileId;
+    }
+  } catch (e) {
+    console.log('读取云数据库 fileID 失败: ' + e.message);
+  }
+  return null;
+}
+
+// 保存 fileID 到云数据库
+async function saveFileIdToCloud(fileId) {
+  if (!tcbApp) return;
+  try {
+    const db = tcbApp.database();
+    await db.collection('config').doc('db_backup_fileid').set({ fileId: fileId, updatedAt: Date.now() });
+    console.log('fileID 已保存到云数据库');
+  } catch (e) {
+    console.log('保存 fileID 到云数据库失败: ' + e.message);
+  }
+}
+
 // 从云存储下载数据库备份
 async function downloadBackup() {
-  if (!tcbApp || !cloudDbFileId) return false;
+  if (!tcbApp) return false;
   try {
+    // 先从云数据库获取 fileID
+    const fid = await loadFileIdFromCloud();
+    if (!fid) {
+      console.log('云数据库中无 fileID，跳过恢复（首次部署正常）');
+      return false;
+    }
+    cloudDbFileId = fid;
+    console.log('从云数据库获取 fileID: ' + cloudDbFileId);
+
     const tempPath = dbPath + '.tmp';
     await tcbApp.downloadFile({
       fileID: cloudDbFileId,
@@ -51,7 +79,7 @@ async function downloadBackup() {
     }
     return false;
   } catch (e) {
-    console.log('云存储下载备份失败（可能首次运行）: ' + e.message);
+    console.log('云存储下载备份失败: ' + e.message);
     return false;
   }
 }
@@ -65,8 +93,8 @@ async function uploadBackup() {
     const result = await tcbApp.uploadFile({ cloudPath: BACKUP_CLOUD_PATH, fileContent: buffer });
     if (result && result.fileID) {
       cloudDbFileId = result.fileID;
-      // 缓存 fileID 到本地
-      try { fs.writeFileSync(FILEID_PATH, cloudDbFileId); } catch(e) {}
+      // 保存 fileID 到云数据库（持久化）
+      await saveFileIdToCloud(cloudDbFileId);
       console.log('数据库已备份到云存储，大小: ' + buffer.length);
     }
   } catch (e) {
