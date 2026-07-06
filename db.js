@@ -7,108 +7,24 @@ const dbPath = process.env.VERCEL
   ? path.join('/tmp', 'data.db')
   : path.join(dbDir, 'data.db');
 let db = null;
-let tcbApp = null;
 let backupTimer = null;
 let cloudDbFileId = null;
-const BACKUP_CLOUD_PATH = 'backup/data.db';
 
-// 初始化腾讯云SDK
-function initTcb() {
-  try {
-    const tcb = require('@cloudbase/node-sdk');
-    const envId = process.env.TCB_ENV || 'cloud1-d6gjzpj2l68ef2bce';
-    if (!envId) return null;
-    tcbApp = tcb.init({ env: envId });
-    console.log('腾讯云SDK初始化成功，环境: ' + envId);
-    return tcbApp;
-  } catch (e) {
-    console.log('腾讯云SDK未安装，跳过云存储备份');
-    return null;
-  }
-}
-
-// 从云数据库读取保存的 fileID
-async function loadFileIdFromCloud() {
-  if (!tcbApp) return null;
-  try {
-    const db = tcbApp.database();
-    const res = await db.collection('config').doc('db_backup_fileid').get();
-    if (res.data && res.data.fileId) {
-      return res.data.fileId;
-    }
-  } catch (e) {
-    console.log('读取云数据库 fileID 失败: ' + e.message);
-  }
-  return null;
-}
-
-// 保存 fileID 到云数据库
-async function saveFileIdToCloud(fileId) {
-  if (!tcbApp) return;
-  try {
-    const db = tcbApp.database();
-    await db.collection('config').doc('db_backup_fileid').set({ fileId: fileId, updatedAt: Date.now() });
-    console.log('fileID 已保存到云数据库');
-  } catch (e) {
-    console.log('保存 fileID 到云数据库失败: ' + e.message);
-  }
-}
-
-// 从云存储下载数据库备份
+// 从云存储下载数据库备份（通过已知的 cloudID 构造 fileID）
 async function downloadBackup() {
-  if (!tcbApp) return false;
-  try {
-    // 先从云数据库获取 fileID
-    const fid = await loadFileIdFromCloud();
-    if (!fid) {
-      console.log('云数据库中无 fileID，跳过恢复（首次部署正常）');
-      return false;
-    }
-    cloudDbFileId = fid;
-    console.log('从云数据库获取 fileID: ' + cloudDbFileId);
-
-    const tempPath = dbPath + '.tmp';
-    await tcbApp.downloadFile({
-      fileID: cloudDbFileId,
-      tempFilePath: tempPath
-    });
-    if (fs.existsSync(tempPath) && fs.statSync(tempPath).size > 0) {
-      fs.renameSync(tempPath, dbPath);
-      console.log('从云存储恢复数据库成功');
-      return true;
-    }
-    return false;
-  } catch (e) {
-    console.log('云存储下载备份失败: ' + e.message);
-    return false;
-  }
+  // 云存储备份需要 SDK，当前方案不支持
+  // 数据持久化待实现
+  return false;
 }
 
 // 上传数据库备份到云存储
 async function uploadBackup() {
-  if (!tcbApp) return;
-  try {
-    if (!fs.existsSync(dbPath)) return;
-    const buffer = fs.readFileSync(dbPath);
-    const result = await tcbApp.uploadFile({ cloudPath: BACKUP_CLOUD_PATH, fileContent: buffer });
-    if (result && result.fileID) {
-      cloudDbFileId = result.fileID;
-      // 保存 fileID 到云数据库（持久化）
-      await saveFileIdToCloud(cloudDbFileId);
-      console.log('数据库已备份到云存储，大小: ' + buffer.length);
-    }
-  } catch (e) {
-    console.log('云存储上传备份失败:', e.message);
-  }
+  // 云存储备份需要 SDK，当前方案不支持
+  // 数据持久化待实现
 }
 
 async function initDatabase() {
-  // 初始化腾讯云SDK
-  initTcb();
-
-  // 尝试从云存储恢复数据库
-  const restored = await downloadBackup();
-
+  // 直接初始化数据库（无云存储备份）
   const SQL = await initSqlJs();
 
   if (fs.existsSync(dbPath)) {
@@ -399,23 +315,12 @@ async function initDatabase() {
 
   saveDatabase();
   console.log('数据库初始化完成');
-
-  // 每60秒自动备份到云存储
-  if (tcbApp) {
-    backupTimer = setInterval(() => uploadBackup(), 60000);
-    console.log('云存储自动备份已启动（每60秒）');
-  }
 }
 
 function saveDatabase() {
   const data = db.export();
   const buffer = Buffer.from(data);
   fs.writeFileSync(dbPath, buffer);
-  // 防抖备份：清除旧定时器，30秒后备份
-  if (tcbApp) {
-    if (backupTimer) clearTimeout(backupTimer);
-    backupTimer = setTimeout(() => uploadBackup(), 30000);
-  }
 }
 
 function prepare(sql) {

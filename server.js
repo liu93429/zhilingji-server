@@ -1024,6 +1024,49 @@ app.get('/api/admin/users', (req, res) => {
   });
 });
 
+// 调试接口：手动触发云端同步
+app.get('/api/debug/sync', async (req, res) => {
+  const info = {
+    wxSecretConfigured: !!WX_SECRET,
+    wxAppid: WX_APPID,
+    wxEnv: WX_ENV,
+    accessToken: accessToken ? '已获取(' + accessToken.substring(0, 10) + '...)' : '未获取',
+    syncFunction: SYNC_FUNCTION
+  };
+  
+  if (!WX_SECRET) {
+    info.error = 'WX_SECRET 未配置，无法同步';
+    return res.json(info);
+  }
+  
+  try {
+    // 测试获取 access_token
+    const token = await getAccessToken();
+    info.accessTokenTest = '获取成功(' + token.substring(0, 10) + '...)';
+    
+    // 测试调用云函数
+    const result = await callCloudFunction('load_all_data', {});
+    info.cloudFunctionResult = result;
+    
+    // 如果有数据，恢复
+    if (result.code === 0 && result.data) {
+      await syncFromCloud();
+      info.restoreResult = '数据恢复完成';
+    }
+  } catch (e) {
+    info.error = e.message;
+  }
+  
+  res.json(info);
+});
+
+// 同步到云端
+app.get('/api/debug/push', (req, res) => {
+  if (!WX_SECRET) return res.json({ error: 'WX_SECRET 未配置' });
+  syncToCloud();
+  res.json({ message: '已触发同步到云端' });
+});
+
 app.get('/api/admin/prompts', (req, res) => {
   const { page = 1, pageSize = 20, keyword = '', category = '' } = req.query;
   const offset = (page - 1) * pageSize;
