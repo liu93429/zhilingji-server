@@ -7,8 +7,66 @@ const dbPath = process.env.VERCEL
   ? path.join('/tmp', 'data.db')
   : path.join(dbDir, 'data.db');
 let db = null;
+let tcbApp = null;
+let backupTimer = null;
+
+// 初始化腾讯云SDK
+function initTcb() {
+  try {
+    const tcb = require('@cloudbase/node-sdk');
+    const envId = process.env.TCB_ENV || '';
+    if (!envId) {
+      console.log('未配置 TCB_ENV 环境变量，跳过云存储备份');
+      return null;
+    }
+    tcbApp = tcb.init({ env: envId });
+    console.log('腾讯云SDK初始化成功，环境: ' + envId);
+    return tcbApp;
+  } catch (e) {
+    console.log('腾讯云SDK初始化失败:', e.message);
+    return null;
+  }
+}
+
+// 从云存储下载数据库备份
+async function downloadBackup() {
+  if (!tcbApp) return false;
+  try {
+    const result = await tcbApp.downloadFile({ cloudPath: 'backup/data.db', fileContent: Buffer.alloc(0) });
+    if (result && result.fileContent && result.fileContent.length > 0) {
+      const dir = path.dirname(dbPath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(dbPath, result.fileContent);
+      console.log('从云存储恢复数据库成功，大小: ' + result.fileContent.length);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.log('云存储下载备份失败（首次运行正常）:', e.message);
+    return false;
+  }
+}
+
+// 上传数据库备份到云存储
+async function uploadBackup() {
+  if (!tcbApp) return;
+  try {
+    if (!fs.existsSync(dbPath)) return;
+    const buffer = fs.readFileSync(dbPath);
+    await tcbApp.uploadFile({ cloudPath: 'backup/data.db', fileContent: buffer });
+    console.log('数据库已备份到云存储，大小: ' + buffer.length);
+  } catch (e) {
+    console.log('云存储上传备份失败:', e.message);
+  }
+}
 
 async function initDatabase() {
+  // 初始化腾讯云SDK
+  initTcb();
+
+  // 尝试从云存储恢复数据库
+  const restored = await downloadBackup();
+
   const SQL = await initSqlJs();
 
   if (fs.existsSync(dbPath)) {
@@ -299,12 +357,23 @@ async function initDatabase() {
 
   saveDatabase();
   console.log('数据库初始化完成');
+
+  // 每60秒自动备份到云存储
+  if (tcbApp) {
+    backupTimer = setInterval(() => uploadBackup(), 60000);
+    console.log('云存储自动备份已启动（每60秒）');
+  }
 }
 
 function saveDatabase() {
   const data = db.export();
   const buffer = Buffer.from(data);
   fs.writeFileSync(dbPath, buffer);
+  // 防抖备份：清除旧定时器，30秒后备份
+  if (tcbApp) {
+    if (backupTimer) clearTimeout(backupTimer);
+    backupTimer = setTimeout(() => uploadBackup(), 30000);
+  }
 }
 
 function prepare(sql) {
