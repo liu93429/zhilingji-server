@@ -17,15 +17,12 @@ function initTcb() {
   try {
     const tcb = require('@cloudbase/node-sdk');
     const envId = process.env.TCB_ENV || 'cloud1-d6gjzpj2l68ef2bce';
-    if (!envId) {
-      console.log('未配置 TCB_ENV 环境变量，跳过云存储备份');
-      return null;
-    }
+    if (!envId) return null;
     tcbApp = tcb.init({ env: envId });
     console.log('腾讯云SDK初始化成功，环境: ' + envId);
     return tcbApp;
   } catch (e) {
-    console.log('腾讯云SDK初始化失败:', e.message);
+    console.log('腾讯云SDK未安装，跳过云存储备份');
     return null;
   }
 }
