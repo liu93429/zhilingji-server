@@ -571,8 +571,6 @@
               <thead class="bg-gray-50">
                 <tr>
                   <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">预览</th>
-                  <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">标题</th>
-                  <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">副标题</th>
                   <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">跳转类型</th>
                   <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">跳转参数</th>
                   <th class="px-5 py-3 text-center text-xs font-semibold text-gray-500 uppercase">状态</th>
@@ -912,16 +910,6 @@
             <img id="banner-image-preview" class="w-full h-full object-cover hidden" alt="">
           </div>
         </div>
-        <!-- 标题 -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1.5">标题 <span class="text-red-400">*</span></label>
-          <input type="text" id="banner-form-title" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm" placeholder="Banner 主标题">
-        </div>
-        <!-- 副标题 -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1.5">副标题</label>
-          <input type="text" id="banner-form-subtitle" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm" placeholder="Banner 副标题描述">
-        </div>
         <!-- 跳转类型 -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1.5">点击跳转 <span class="text-red-400">*</span></label>
@@ -939,20 +927,6 @@
         <div id="banner-link-param-wrap">
           <label class="block text-sm font-medium text-gray-700 mb-1.5">跳转参数</label>
           <input type="text" id="banner-form-link-param" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm" placeholder="如指令ID或其他参数">
-        </div>
-        <!-- 渐变样式 -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1.5">背景渐变色</label>
-          <div class="flex gap-2">
-            <div class="flex items-center gap-1.5">
-              <input type="color" id="banner-form-gradient-start" value="#FF6B9D" class="w-8 h-8 rounded border border-gray-200 cursor-pointer">
-              <span class="text-xs text-gray-400">起始色</span>
-            </div>
-            <div class="flex items-center gap-1.5">
-              <input type="color" id="banner-form-gradient-end" value="#C4B5FD" class="w-8 h-8 rounded border border-gray-200 cursor-pointer">
-              <span class="text-xs text-gray-400">结束色</span>
-            </div>
-          </div>
         </div>
         <!-- 排序号 -->
         <div>
@@ -2379,18 +2353,16 @@
         return;
       }
       if (banners.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-400">暂无 Banner，点击右上角添加</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-400">暂无 Banner，点击右上角添加</td></tr>';
         return;
       }
       const sortedBanners = [...banners].sort((a, b) => a.sort - b.sort);
       const typeNames = { none: '不跳转', prompt: '指令详情', vip: '会员权益', invite: '邀请拉新', credits: '积分规则', custom: '自定义' };
       tbody.innerHTML = sortedBanners.map(b =>
         '<tr class="hover:bg-brand-light/30 transition-colors">' +
-        '<td class="px-5 py-3.5"><div class="w-24 h-12 rounded-lg overflow-hidden bg-gray-100">' +
+        '<td class="px-5 py-3.5"><div class="w-36 h-16 rounded-lg overflow-hidden bg-gray-100">' +
         (b.image ? '<img src="' + b.image + '" class="w-full h-full object-cover" alt="">' : '<div class="w-full h-full flex items-center justify-center"><span class="text-xs text-gray-400">无图片</span></div>') +
         '</div></td>' +
-        '<td class="px-5 py-3.5"><span class="text-sm font-medium text-gray-800">' + b.title + '</span></td>' +
-        '<td class="px-5 py-3.5"><span class="text-sm text-gray-500 truncate max-w-[160px] block">' + (b.subtitle || '-') + '</span></td>' +
         '<td class="px-5 py-3.5"><span class="text-xs font-medium px-2 py-1 rounded-full bg-brand/10 text-brand">' + (typeNames[b.linkType] || b.linkType) + '</span></td>' +
         '<td class="px-5 py-3.5"><span class="text-sm text-gray-500">' + (b.linkParam || '-') + '</span></td>' +
         '<td class="px-5 py-3.5 text-center"><button onclick="toggleBannerStatus(' + b.id + ')" class="px-2.5 py-1 text-xs font-medium rounded-full ' + (b.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500') + '">' + (b.status === 'active' ? '上架中' : '已下架') + '</button></td>' +
@@ -2406,12 +2378,8 @@
     function openBannerModal() {
       editingBannerId = null;
       document.getElementById('banner-modal-title').textContent = '添加 Banner';
-      document.getElementById('banner-form-title').value = '';
-      document.getElementById('banner-form-subtitle').value = '';
       document.getElementById('banner-form-link-type').value = 'none';
       document.getElementById('banner-form-link-param').value = '';
-      document.getElementById('banner-form-gradient-start').value = '#FF6B9D';
-      document.getElementById('banner-form-gradient-end').value = '#C4B5FD';
       document.getElementById('banner-form-sort').value = String(banners.length);
       currentBannerImage = '';
       document.getElementById('banner-image-url').value = '';
@@ -2433,12 +2401,8 @@
       if (!b) return;
       editingBannerId = id;
       document.getElementById('banner-modal-title').textContent = '编辑 Banner';
-      document.getElementById('banner-form-title').value = b.title;
-      document.getElementById('banner-form-subtitle').value = b.subtitle || '';
       document.getElementById('banner-form-link-type').value = b.linkType;
       document.getElementById('banner-form-link-param').value = b.linkParam || '';
-      document.getElementById('banner-form-gradient-start').value = b.gradientStart || '#FF6B9D';
-      document.getElementById('banner-form-gradient-end').value = b.gradientEnd || '#C4B5FD';
       document.getElementById('banner-form-sort').value = String(b.sort);
       currentBannerImage = b.image || '';
       document.getElementById('banner-image-url').value = currentBannerImage;
@@ -2492,16 +2456,15 @@
     }
 
     async function saveBanner() {
-      const title = document.getElementById('banner-form-title').value.trim();
-      if (!title) { showToast('请输入 Banner 标题', 'warning'); return; }
+      if (!currentBannerImage) { showToast('请输入 Banner 图片URL', 'warning'); return; }
       const data = {
-        title,
-        subtitle: document.getElementById('banner-form-subtitle').value.trim(),
+        title: 'Banner ' + (editingBannerId || Date.now()),
+        subtitle: '',
         linkType: document.getElementById('banner-form-link-type').value,
         linkParam: document.getElementById('banner-form-link-param').value.trim(),
         image: currentBannerImage,
-        gradientStart: document.getElementById('banner-form-gradient-start').value,
-        gradientEnd: document.getElementById('banner-form-gradient-end').value,
+        gradientStart: '',
+        gradientEnd: '',
         sort: parseInt(document.getElementById('banner-form-sort').value) || 0
       };
       try {
