@@ -903,14 +903,14 @@
         <!-- Banner 图片上传 -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1.5">Banner 图片 <span class="text-red-400">*</span></label>
-          <div class="banner-upload-area w-full h-40 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden bg-gray-50 cursor-pointer hover:border-brand transition-colors" onclick="document.getElementById('banner-image-input').click()">
+          <input type="text" id="banner-image-url" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none mb-2" placeholder="输入图片URL，如 https://picsum.photos/seed/banner1/750/360" oninput="updateBannerFromUrl(this.value)">
+          <div class="banner-upload-area w-full h-40 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden bg-gray-50">
             <div id="banner-image-placeholder" class="text-center">
               <i data-lucide="image-plus" class="w-10 h-10 text-gray-300 mx-auto"></i>
-              <p class="text-sm text-gray-400 mt-1">点击上传 Banner 图片（建议 750×360px）</p>
+              <p class="text-sm text-gray-400 mt-1">填写上方URL后预览</p>
             </div>
             <img id="banner-image-preview" class="w-full h-full object-cover hidden" alt="">
           </div>
-          <input type="file" id="banner-image-input" class="hidden" accept="image/*" onchange="handleBannerImageUpload(this)">
         </div>
         <!-- 标题 -->
         <div>
@@ -2414,6 +2414,7 @@
       document.getElementById('banner-form-gradient-end').value = '#C4B5FD';
       document.getElementById('banner-form-sort').value = String(banners.length);
       currentBannerImage = '';
+      document.getElementById('banner-image-url').value = '';
       document.getElementById('banner-image-preview').classList.add('hidden');
       document.getElementById('banner-image-placeholder').classList.remove('hidden');
       document.getElementById('banner-link-param-wrap').style.display = 'none';
@@ -2440,6 +2441,7 @@
       document.getElementById('banner-form-gradient-end').value = b.gradientEnd || '#C4B5FD';
       document.getElementById('banner-form-sort').value = String(b.sort);
       currentBannerImage = b.image || '';
+      document.getElementById('banner-image-url').value = currentBannerImage;
       if (currentBannerImage) {
         document.getElementById('banner-image-preview').src = currentBannerImage;
         document.getElementById('banner-image-preview').classList.remove('hidden');
@@ -2451,6 +2453,18 @@
       updateBannerLinkHint();
       document.getElementById('banner-modal').classList.remove('hidden');
       lucide.createIcons();
+    }
+
+    function updateBannerFromUrl(url) {
+      currentBannerImage = url.trim();
+      if (currentBannerImage) {
+        document.getElementById('banner-image-preview').src = currentBannerImage;
+        document.getElementById('banner-image-preview').classList.remove('hidden');
+        document.getElementById('banner-image-placeholder').classList.add('hidden');
+      } else {
+        document.getElementById('banner-image-preview').classList.add('hidden');
+        document.getElementById('banner-image-placeholder').classList.remove('hidden');
+      }
     }
 
     function handleBannerImageUpload(input) {
