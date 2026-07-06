@@ -1,10 +1,152 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const https = require('https');
 const { db, initDb } = require('./db.js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// ── 云函数调用配置 ──
+const WX_APPID = process.env.WX_APPID || 'wx2359d3da2f0e99b1';
+const WX_SECRET = process.env.WX_SECRET || '';
+const WX_ENV = process.env.WX_ENV || 'cloud1-d6gjzpj2l68ef2bce';
+const SYNC_FUNCTION = 'dbSync';
+const SYNC_SECRET = 'zhilingji_sync_2024';
+let accessToken = '';
+let tokenExpireTime = 0;
+
+// 获取 access_token
+function getAccessToken() {
+  if (accessToken && Date.now() < tokenExpireTime) {
+    return Promise.resolve(accessToken);
+  }
+  return new Promise((resolve, reject) => {
+    const url = 'https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=' + WX_APPID + '&secret=' + WX_SECRET;
+    https.get(url, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const result = JSON.parse(data);
+          if (result.access_token) {
+            accessToken = result.access_token;
+            tokenExpireTime = Date.now() + (result.expires_in - 300) * 1000;
+            resolve(accessToken);
+          } else {
+            reject(new Error('获取token失败: ' + data));
+          }
+        } catch (e) { reject(e); }
+      });
+    }).on('error', reject);
+  });
+}
+
+// 调用云函数
+function callCloudFunction(action, data) {
+  return getAccessToken().then(token => {
+    return new Promise((resolve, reject) => {
+      const postData = JSON.stringify({ action, data, secret: SYNC_SECRET });
+      const options = {
+        hostname: 'api.weixin.qq.com',
+        path: '/tcb/invokecloudfunction?access_token=' + token + '&env=' + WX_ENV + '&name=' + SYNC_FUNCTION,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(postData) }
+      };
+      const req = https.request(options, (res) => {
+        let body = '';
+        res.on('data', chunk => body += chunk);
+        res.on('end', () => {
+          try {
+            const result = JSON.parse(body);
+            // 微信API返回格式：{ resp_body: "{ ... }" }
+            const respBody = result.resp_body ? JSON.parse(result.resp_body) : result;
+            resolve(respBody);
+          } catch (e) { reject(e); }
+        });
+      });
+      req.on('error', reject);
+      req.write(postData);
+      req.end();
+    });
+  });
+}
+
+// 从云端恢复所有数据到本地 SQLite
+async function syncFromCloud() {
+  try {
+    if (!WX_SECRET) {
+      console.log('未配置 WX_SECRET，跳过云端同步');
+      return;
+    }
+    console.log('开始从云端恢复数据...');
+    const result = await callCloudFunction('load_all_data', {});
+    if (result.code === 0 && result.data) {
+      const { prompts, banners } = result.data;
+      
+      // 恢复指令
+      if (prompts && prompts.length > 0) {
+        db.prepare('DELETE FROM prompts').run();
+        const insert = db.prepare(`INSERT INTO prompts (id, title, description, category, tags, prompt_text, style, cover, images, price, credits_cost, popularity, downloads, status, sort_order, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        for (const p of prompts) {
+          const images = Array.isArray(p.images) ? JSON.stringify(p.images) : (p.images || '[]');
+          const tags = Array.isArray(p.tags) ? JSON.stringify(p.tags) : (p.tags || '[]');
+          insert.run(
+            String(p.id || 0), p.title || '', p.description || '', p.category || '',
+            tags, p.prompt_text || p.promptText || '', p.style || '',
+            p.cover || '', images,
+            p.price || 0, p.credits_cost || p.creditsCost || 3,
+            p.popularity || 0, p.downloads || 0,
+            p.status || 'active', p.sort_order || p.sortOrder || 0,
+            p.createdAt || p.created_at || '', p.updatedAt || p.updated_at || ''
+          );
+        }
+        console.log('恢复了 ' + prompts.length + ' 条指令');
+      }
+      
+      // 恢复 banner
+      if (banners && banners.length > 0) {
+        db.prepare('DELETE FROM banners').run();
+        const insert = db.prepare(`INSERT INTO banners (id, title, subtitle, image, link_type, link_param, gradient_start, gradient_end, status, sort, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        for (const b of banners) {
+          insert.run(
+            String(b.id || 0), b.title || '', b.subtitle || '',
+            b.image || '', b.link_type || b.linkType || 'none',
+            b.link_param || b.linkParam || '',
+            b.gradient_start || b.gradientStart || '', b.gradient_end || b.gradientEnd || '',
+            b.status || 'active', b.sort || b.sort_order || 0,
+            b.createdAt || ''
+          );
+        }
+        console.log('恢复了 ' + banners.length + ' 条 banner');
+      }
+      
+      const { saveDatabase } = require('./db.js');
+      saveDatabase();
+      console.log('云端数据恢复完成');
+    } else {
+      console.log('云端无数据，使用默认数据');
+    }
+  } catch (e) {
+    console.log('云端同步失败（首次部署正常）: ' + e.message);
+  }
+}
+
+// 同步数据到云端（数据变动后调用）
+function syncToCloud() {
+  if (!WX_SECRET) return;
+  try {
+    const prompts = db.prepare('SELECT * FROM prompts').all();
+    const banners = db.prepare('SELECT * FROM banners').all();
+    callCloudFunction('save_all_data', { prompts, banners }).catch(e => {
+      console.log('同步到云端失败:', e.message);
+    });
+  } catch (e) {
+    console.log('同步到云端失败:', e.message);
+  }
+}
 
 app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
@@ -953,6 +1095,7 @@ app.post('/api/admin/prompts', (req, res) => {
     code: 0,
     data: { id: result.lastInsertRowid }
   });
+  syncToCloud();
 });
 
 app.put('/api/admin/prompts/:id', (req, res) => {
@@ -988,12 +1131,14 @@ app.put('/api/admin/prompts/:id', (req, res) => {
     code: 0,
     data: { success: true }
   });
+  syncToCloud();
 });
 
 app.delete('/api/admin/prompts/:id', (req, res) => {
   const { id } = req.params;
   db.prepare('DELETE FROM prompts WHERE id = ?').run(id);
   res.json({ code: 0, data: { success: true } });
+  syncToCloud();
 });
 
 app.get('/api/admin/feedback', (req, res) => {
@@ -1109,6 +1254,7 @@ app.post('/api/admin/banners', (req, res) => {
     'INSERT INTO banners (title, subtitle, image, link_type, link_param, gradient_start, gradient_end, sort, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(title, subtitle, image, linkType, linkParam, gradientStart, gradientEnd, parseInt(sort) || 0, 'active');
   res.json({ code: 0, data: { id: result.lastInsertRowid } });
+  syncToCloud();
 });
 
 // 管理端：编辑 Banner
@@ -1134,6 +1280,7 @@ app.put('/api/admin/banners/:id', (req, res) => {
   values.push(id);
   db.prepare(`UPDATE banners SET ${fields.join(', ')} WHERE id = ?`).run(...values);
   res.json({ code: 0, data: { success: true } });
+  syncToCloud();
 });
 
 // 管理端：切换 Banner 上下架状态
@@ -1146,6 +1293,7 @@ app.put('/api/admin/banners/:id/toggle', (req, res) => {
   const newStatus = existing.status === 'active' ? 'inactive' : 'active';
   db.prepare('UPDATE banners SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newStatus, id);
   res.json({ code: 0, data: { success: true, status: newStatus } });
+  syncToCloud();
 });
 
 // 管理端：删除 Banner
@@ -1153,6 +1301,7 @@ app.delete('/api/admin/banners/:id', (req, res) => {
   const { id } = req.params;
   db.prepare('DELETE FROM banners WHERE id = ?').run(id);
   res.json({ code: 0, data: { success: true } });
+  syncToCloud();
 });
 
 (async () => {
@@ -1161,6 +1310,8 @@ app.delete('/api/admin/banners/:id', (req, res) => {
     app.listen(PORT, () => {
       console.log(`服务器运行在 http://localhost:${PORT}`);
       console.log(`管理后台: http://localhost:${PORT}/admin`);
+      // 启动后从云端恢复数据
+      syncFromCloud();
     });
   } catch (err) {
     console.error('数据库初始化失败:', err);
