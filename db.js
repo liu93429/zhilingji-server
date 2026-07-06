@@ -2,9 +2,10 @@ const initSqlJs = require('sql.js');
 const fs = require('fs');
 const path = require('path');
 
+const dbDir = fs.existsSync('/app/data') ? '/app/data' : __dirname;
 const dbPath = process.env.VERCEL
   ? path.join('/tmp', 'data.db')
-  : path.join(__dirname, 'data.db');
+  : path.join(dbDir, 'data.db');
 let db = null;
 
 async function initDatabase() {
