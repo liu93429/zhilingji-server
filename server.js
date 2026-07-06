@@ -1307,11 +1307,13 @@ app.delete('/api/admin/banners/:id', (req, res) => {
 (async () => {
   try {
     await initDb();
-    app.listen(PORT, () => {
+    app.listen(PORT, async () => {
       console.log(`服务器运行在 http://localhost:${PORT}`);
       console.log(`管理后台: http://localhost:${PORT}/admin`);
-      // 启动后从云端恢复数据
-      syncFromCloud();
+      console.log('WX_SECRET 配置状态: ' + (WX_SECRET ? '已配置' : '未配置!!!'));
+      // 启动后从云端恢复数据（等待完成）
+      await syncFromCloud();
+      console.log('数据恢复流程结束');
     });
   } catch (err) {
     console.error('数据库初始化失败:', err);
