@@ -1,0 +1,128 @@
+<!-- pages/home/home.wxml -->
+<view class="home-page">
+
+  <!-- 自定义导航栏 -->
+  <custom-nav title="锦秀相册" transparent="{{false}}" showBack="{{false}}"></custom-nav>
+
+  <!-- 搜索栏 -->
+  <view class="search-section">
+    <view class="search-bar" bindtap="onSearchTap">
+      <view class="search-icon-wrap">
+        <view class="search-icon-circle"></view>
+        <view class="search-icon-line"></view>
+      </view>
+      <text class="search-placeholder">搜索AI写真指令...</text>
+    </view>
+  </view>
+
+  <!-- Banner 轮播 -->
+  <view class="banner-section">
+    <swiper
+      class="banner-swiper"
+      indicator-dots="{{true}}"
+      indicator-color="rgba(255,255,255,0.4)"
+      indicator-active-color="#FFFFFF"
+      autoplay="{{true}}"
+      interval="{{3000}}"
+      circular="{{true}}"
+      duration="{{500}}"
+      current="{{currentBanner}}"
+      bindchange="onBannerChange"
+    >
+      <swiper-item wx:for="{{banners}}" wx:key="index">
+        <view class="banner-slide" bindtap="onBannerTap" data-index="{{index}}">
+          <image
+            class="banner-image"
+            src="{{item.image}}"
+            mode="aspectFill"
+          ></image>
+        </view>
+      </swiper-item>
+    </swiper>
+  </view>
+
+  <!-- 最新上传（紧接 Banner 下方） -->
+  <view class="recommend-section">
+    <view class="section-header">
+      <view class="section-title-wrap">
+        <text class="section-title">最新上传</text>
+        <text class="section-title-emoji"> 📋</text>
+      </view>
+      <text class="section-more" bindtap="onViewMoreLatest">查看更多 ›</text>
+    </view>
+    <scroll-view scroll-x class="recommend-scroll" enhanced show-scrollbar="{{false}}">
+      <view class="recommend-list">
+        <view class="recommend-card" wx:for="{{recommendList}}" wx:key="id" bindtap="onRecommendTap" data-id="{{item.id}}">
+          <view class="recommend-img-wrap">
+            <image src="{{item.image}}" class="recommend-img" mode="aspectFill"></image>
+          </view>
+          <view class="recommend-info">
+            <text class="recommend-title ellipsis">{{item.title}}</text>
+            <text class="tag {{item.tagStyle}}">{{item.tag}}</text>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 分类标签 -->
+  <view class="category-section">
+    <scroll-view class="category-scroll no-scrollbar" scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view class="category-list">
+        <view
+          class="category-item {{item.active ? 'active' : ''}} {{item.style}}"
+          wx:for="{{categories}}"
+          wx:key="name"
+          data-name="{{item.name}}"
+          bindtap="onCategoryTap"
+        >
+          <text class="category-name">{{item.name}}</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 推荐指令 -->
+  <view class="prompt-section">
+    <view class="section-header">
+      <view class="section-title-wrap">
+        <text class="section-title">推荐指令</text>
+        <text class="section-title-emoji"> ✨</text>
+      </view>
+      <view class="section-more" bindtap="onViewMore">
+        <text class="section-more-text">查看更多</text>
+        <text class="section-more-arrow"> ›</text>
+      </view>
+    </view>
+
+    <!-- 双列卡片网格 -->
+    <view class="card-grid">
+      <view
+        class="card-item"
+        wx:for="{{cards}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="onCardTap"
+      >
+        <view class="card-image-wrap">
+          <image
+            class="card-image"
+            src="{{item.image}}"
+            mode="aspectFill"
+            lazy-load="{{true}}"
+          ></image>
+        </view>
+        <view class="card-info">
+          <text class="card-title ellipsis">{{item.title}}</text>
+          <view class="card-tag {{item.tagStyle}}">
+            <text class="card-tag-text">{{item.tag}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部安全区 -->
+  <view class="bottom-safe"></view>
+
+</view>

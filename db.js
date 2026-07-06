@@ -9,6 +9,8 @@ const dbPath = process.env.VERCEL
 let db = null;
 let tcbApp = null;
 let backupTimer = null;
+let cloudDbFileId = null;
+const BACKUP_CLOUD_PATH = 'backup/data.db';
 
 // 初始化腾讯云SDK
 function initTcb() {
@@ -32,14 +34,36 @@ function initTcb() {
 async function downloadBackup() {
   if (!tcbApp) return false;
   try {
-    const result = await tcbApp.downloadFile({ cloudPath: 'backup/data.db', fileContent: Buffer.alloc(0) });
-    if (result && result.fileContent && result.fileContent.length > 0) {
-      const dir = path.dirname(dbPath);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(dbPath, result.fileContent);
-      console.log('从云存储恢复数据库成功，大小: ' + result.fileContent.length);
-      return true;
+    // fileID 丢失时，先尝试通过 cloudPath 上传一个空文件来获取 fileID
+    // 这样就能知道 fileID，然后再尝试下载
+    const tempPath = dbPath + '.tmp';
+    
+    // 尝试直接下载（用 cloudPath 作为 fileID 的猜测）
+    const envId = process.env.TCB_ENV || 'cloud1-d6gjzpj2l68ef2bce';
+    const possibleFileIds = [
+      'cloud://' + envId + '/' + BACKUP_CLOUD_PATH,
+      'cloud://' + envId + '.' + BACKUP_CLOUD_PATH.replace(/\//g, '.')
+    ];
+    
+    for (const fid of possibleFileIds) {
+      try {
+        const result = await tcbApp.downloadFile({
+          fileID: fid,
+          tempFilePath: tempPath
+        });
+        if (fs.existsSync(tempPath) && fs.statSync(tempPath).size > 0) {
+          const dir = path.dirname(dbPath);
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+          fs.renameSync(tempPath, dbPath);
+          cloudDbFileId = fid;
+          console.log('从云存储恢复数据库成功, fileID: ' + fid);
+          return true;
+        }
+      } catch (e) {
+        // 忽略，尝试下一个
+      }
     }
+    
     return false;
   } catch (e) {
     console.log('云存储下载备份失败（首次运行正常）:', e.message);
@@ -53,8 +77,11 @@ async function uploadBackup() {
   try {
     if (!fs.existsSync(dbPath)) return;
     const buffer = fs.readFileSync(dbPath);
-    await tcbApp.uploadFile({ cloudPath: 'backup/data.db', fileContent: buffer });
-    console.log('数据库已备份到云存储，大小: ' + buffer.length);
+    const result = await tcbApp.uploadFile({ cloudPath: BACKUP_CLOUD_PATH, fileContent: buffer });
+    if (result && result.fileID) {
+      cloudDbFileId = result.fileID;
+      console.log('数据库已备份到云存储，fileID: ' + cloudDbFileId + '，大小: ' + buffer.length);
+    }
   } catch (e) {
     console.log('云存储上传备份失败:', e.message);
   }
