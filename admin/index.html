@@ -2470,11 +2470,11 @@
       try {
         if (editingBannerId) {
           await apiPut('/admin/banners/' + editingBannerId, data);
-          addLog('编辑了Banner「' + title + '」', 'edit');
+          addLog('编辑了Banner', 'edit');
           showToast('Banner已更新', 'success');
         } else {
           await apiPost('/admin/banners', data);
-          addLog('添加了Banner「' + title + '」', 'add');
+          addLog('添加了Banner', 'add');
           showToast('Banner已添加', 'success');
         }
         await renderBanners();
