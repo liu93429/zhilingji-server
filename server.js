@@ -87,19 +87,29 @@ async function syncFromCloud() {
       // 恢复指令
       if (prompts && prompts.length > 0) {
         db.prepare('DELETE FROM prompts').run();
-        const insert = db.prepare(`INSERT INTO prompts (id, title, description, category, tags, prompt_text, style, cover, images, price, credits_cost, popularity, downloads, status, sort_order, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        const insert = db.prepare(`INSERT INTO prompts (id, title, description, content, category, tags, cover, images, copy_count, ad_unlock_count, view_count, is_top, weight, is_recommended, status, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
         for (const p of prompts) {
           const images = Array.isArray(p.images) ? JSON.stringify(p.images) : (p.images || '[]');
           const tags = Array.isArray(p.tags) ? JSON.stringify(p.tags) : (p.tags || '[]');
           insert.run(
-            String(p.id || 0), p.title || '', p.description || '', p.category || '',
-            tags, p.prompt_text || p.promptText || '', p.style || '',
-            p.cover || '', images,
-            p.price || 0, p.credits_cost || p.creditsCost || 3,
-            p.popularity || 0, p.downloads || 0,
-            p.status || 'active', p.sort_order || p.sortOrder || 0,
-            p.createdAt || p.created_at || '', p.updatedAt || p.updated_at || ''
+            p.id || 0,
+            p.title || '',
+            p.description || p.content || '',
+            p.content || p.prompt || p.promptText || '',
+            p.category || p.tag || '',
+            tags,
+            p.cover || p.image || '',
+            images,
+            p.copy_count || p.copies || 0,
+            p.ad_unlock_count || 0,
+            p.view_count || 0,
+            p.is_top || p.isTop || 0,
+            p.weight || 1,
+            p.is_recommended || p.isRecommend || 0,
+            p.status !== undefined ? p.status : 1,
+            p.created_at || p.createdAt || '',
+            p.updated_at || p.updatedAt || ''
           );
         }
         console.log('恢复了 ' + prompts.length + ' 条指令');
@@ -112,12 +122,17 @@ async function syncFromCloud() {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
         for (const b of banners) {
           insert.run(
-            String(b.id || 0), b.title || '', b.subtitle || '',
-            b.image || '', b.link_type || b.linkType || 'none',
+            b.id || 0,
+            b.title || '',
+            b.subtitle || '',
+            b.image || '',
+            b.link_type || b.linkType || 'none',
             b.link_param || b.linkParam || '',
-            b.gradient_start || b.gradientStart || '', b.gradient_end || b.gradientEnd || '',
-            b.status || 'active', b.sort || b.sort_order || 0,
-            b.createdAt || ''
+            b.gradient_start || b.gradientStart || '',
+            b.gradient_end || b.gradientEnd || '',
+            b.status || 'active',
+            b.sort || b.sort_order || 0,
+            b.createdAt || b.created_at || ''
           );
         }
         console.log('恢复了 ' + banners.length + ' 条 banner');
