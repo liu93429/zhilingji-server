@@ -709,15 +709,16 @@
           </div>
           <!-- 效果图URL -->
           <div class="mb-3">
-            <p class="text-xs text-gray-500 mb-1.5">效果图URL（详情页轮播展示，多张用英文逗号分隔）</p>
-            <input type="text" id="slides-url-input" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none" placeholder="多张图片URL用逗号分隔，如 https://xxx.jpg,https://yyy.jpg" oninput="updateSlidesFromUrl(this.value)">
+            <div class="flex items-center justify-between mb-1.5">
+              <p class="text-xs text-gray-500">效果图URL（详情页轮播展示）</p>
+              <button type="button" onclick="addSlideInput()" class="text-xs text-brand hover:text-brand-dark transition-colors flex items-center gap-0.5">
+                <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> 添加一张
+              </button>
+            </div>
+            <div id="slides-input-list" class="space-y-2">
+              <!-- 动态生成 -->
+            </div>
             <div id="slides-preview" class="flex flex-wrap gap-2 mt-2">
-              <div id="slides-add-btn" class="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50">
-                <div class="text-center">
-                  <i data-lucide="plus" class="w-5 h-5 text-gray-300 mx-auto"></i>
-                  <p class="text-[10px] text-gray-400 mt-0.5">暂无</p>
-                </div>
-              </div>
             </div>
             <input type="file" id="slides-input" class="hidden" accept="image/*" multiple onchange="handleSlidesUpload(this)">
           </div>
@@ -1555,7 +1556,7 @@
       currentCover = '';
       currentSlides = [];
       document.getElementById('cover-url-input').value = '';
-      document.getElementById('slides-url-input').value = '';
+      renderSlideInputs();
       resetImagePreviews();
       renderCommonTags();
       document.getElementById('prompt-modal').classList.remove('hidden');
@@ -1599,7 +1600,7 @@
       currentSlides = slidesArr;
       // 回填URL到输入框
       document.getElementById('cover-url-input').value = currentCover;
-      document.getElementById('slides-url-input').value = slidesArr.join(', ');
+      renderSlideInputs();
       renderImagePreviews();
 
 
@@ -1637,7 +1638,7 @@
         description: description,
         tags: tagsArr,
         cover: currentCover,
-        images: currentSlides,
+        images: currentSlides.filter(s => s && s.trim()),
         weight: weight,
         is_top: 0,
         is_recommended: 0
@@ -2095,9 +2096,46 @@
       renderImagePreviews();
     }
 
+    function renderSlideInputs() {
+      const container = document.getElementById('slides-input-list');
+      // 确保至少有4个输入框
+      while (currentSlides.length < 4) currentSlides.push('');
+      let html = '';
+      for (let i = 0; i < currentSlides.length; i++) {
+        html += '<div class="flex items-center gap-2">' +
+          '<input type="text" class="slide-url-input flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none" placeholder="效果图' + (i + 1) + ' URL" value="' + (currentSlides[i] || '') + '" oninput="onSlideInput(' + i + ', this.value)">' +
+          (i >= 4
+            ? '<button type="button" onclick="removeSlideInput(' + i + ')" class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"><i data-lucide="trash-2" class="w-4 h-4"></i></button>'
+            : '<div class="w-8 flex-shrink-0"></div>') +
+          '</div>';
+      }
+      container.innerHTML = html;
+      lucide.createIcons();
+    }
+
+    function onSlideInput(index, val) {
+      currentSlides[index] = val.trim();
+      renderImagePreviews();
+    }
+
+    function addSlideInput() {
+      currentSlides.push('');
+      renderSlideInputs();
+      // 聚焦新输入框
+      const inputs = document.querySelectorAll('.slide-url-input');
+      if (inputs.length > 0) inputs[inputs.length - 1].focus();
+    }
+
+    function removeSlideInput(index) {
+      currentSlides.splice(index, 1);
+      renderSlideInputs();
+      renderImagePreviews();
+    }
+
     function updateSlidesFromUrl(val) {
       const urls = val.split(',').map(s => s.trim()).filter(Boolean);
       currentSlides = urls;
+      renderSlideInputs();
       renderImagePreviews();
     }
 
@@ -2113,15 +2151,17 @@
         coverPlaceholder.classList.remove('hidden');
       }
       const container = document.getElementById('slides-preview');
-      let html = currentSlides.map((src, idx) =>
-        '<div class="relative group slide-item" data-index="' + idx + '">' +
+      const validSlides = currentSlides.filter(s => s && s.trim());
+      let html = validSlides.map((src, idx) => {
+        const realIdx = currentSlides.indexOf(src);
+        return '<div class="relative group slide-item" data-index="' + realIdx + '">' +
         '<img src="' + src + '" class="w-20 h-20 rounded-lg object-cover border border-gray-200" alt="效果图' + (idx + 1) + '">' +
-        '<button type="button" onclick="removeSlide(' + idx + ')" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity leading-none">&times;</button>' +
+        '<button type="button" onclick="removeSlide(' + realIdx + ')" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity leading-none">&times;</button>' +
         (currentCover === src
           ? '<span class="absolute bottom-0 left-0 right-0 text-center text-[9px] bg-brand text-white rounded-b-lg leading-4">封面</span>'
-          : '<button type="button" onclick="setCoverFromSlide(' + idx + ')" class="absolute bottom-0 left-0 right-0 text-center text-[9px] bg-black/50 text-white rounded-b-lg leading-4 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-brand">设为封面</button>') +
-        '</div>'
-      ).join('');
+          : '<button type="button" onclick="setCoverFromSlide(' + realIdx + ')" class="absolute bottom-0 left-0 right-0 text-center text-[9px] bg-black/50 text-white rounded-b-lg leading-4 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-brand">设为封面</button>') +
+        '</div>';
+      }).join('');
       html += '<div id="slides-add-btn" class="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 cursor-pointer hover:border-brand transition-colors" onclick="document.getElementById(\'slides-input\').click()">' +
         '<div class="text-center"><i data-lucide="plus" class="w-5 h-5 text-gray-300 mx-auto"></i><p class="text-[10px] text-gray-400 mt-0.5">添加</p></div></div>';
       container.innerHTML = html;
