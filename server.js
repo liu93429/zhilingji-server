@@ -88,7 +88,7 @@ async function syncFromCloud() {
       if (prompts && prompts.length > 0) {
         db.prepare('DELETE FROM prompts').run();
         const insert = db.prepare(`INSERT INTO prompts (id, title, description, content, category, tags, cover, images, copy_count, ad_unlock_count, view_count, is_top, weight, is_recommended, status, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
         for (const p of prompts) {
           const images = Array.isArray(p.images) ? JSON.stringify(p.images) : (p.images || '[]');
           const tags = Array.isArray(p.tags) ? JSON.stringify(p.tags) : (p.tags || '[]');
