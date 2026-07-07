@@ -135,16 +135,17 @@ async function syncFromCloud() {
 }
 
 // 同步数据到云端（数据变动后调用）
-function syncToCloud() {
+async function syncToCloud() {
   if (!WX_SECRET) return;
+  console.log('[同步] 开始同步数据到云端...');
   try {
     const prompts = db.prepare('SELECT * FROM prompts').all();
     const banners = db.prepare('SELECT * FROM banners').all();
-    callCloudFunction('save_all_data', { prompts, banners }).catch(e => {
-      console.log('同步到云端失败:', e.message);
-    });
+    console.log('[同步] 准备同步 ' + prompts.length + ' 条指令, ' + banners.length + ' 条 banner');
+    const result = await callCloudFunction('save_all_data', { prompts, banners });
+    console.log('[同步] 云端同步结果: ' + JSON.stringify(result));
   } catch (e) {
-    console.log('同步到云端失败:', e.message);
+    console.log('[同步] 同步到云端失败:', e.message);
   }
 }
 
