@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const https = require('https');
-const { db, initDb } = require('./db.js');
+const { db, initDb, onDataChange, saveDatabase } = require('./db.js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -83,6 +83,7 @@ async function syncFromCloud() {
     const result = await callCloudFunction('load_all_data', {});
     if (result.code === 0 && result.data) {
       const { prompts, banners } = result.data;
+      const users = result.data.users;
       
       // 恢复指令
       if (prompts && prompts.length > 0) {
@@ -138,7 +139,28 @@ async function syncFromCloud() {
         console.log('恢复了 ' + banners.length + ' 条 banner');
       }
       
-      const { saveDatabase } = require('./db.js');
+      // 恢复用户
+      if (users && users.length > 0) {
+        db.prepare('DELETE FROM users').run();
+        const insert = db.prepare(`INSERT INTO users (id, openid, nickname, avatar, credits, total_earned, total_spent, inviter_openid, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        for (const u of users) {
+          insert.run(
+            u.id || 0,
+            u.openid || '',
+            u.nickname || '',
+            u.avatar || '',
+            u.credits || 0,
+            u.total_earned || 10,
+            u.total_spent || 0,
+            u.inviter_openid || null,
+            u.created_at || '',
+            u.updated_at || ''
+          );
+        }
+        console.log('恢复了 ' + users.length + ' 个用户');
+      }
+      
       saveDatabase();
       console.log('云端数据恢复完成');
     } else {
@@ -156,13 +178,21 @@ async function syncToCloud() {
   try {
     const prompts = db.prepare('SELECT * FROM prompts').all();
     const banners = db.prepare('SELECT * FROM banners').all();
-    console.log('[同步] 准备同步 ' + prompts.length + ' 条指令, ' + banners.length + ' 条 banner');
-    const result = await callCloudFunction('save_all_data', { prompts, banners });
+    const users = db.prepare('SELECT * FROM users').all();
+    console.log('[同步] 准备同步 ' + prompts.length + ' 条指令, ' + banners.length + ' 条 banner, ' + users.length + ' 个用户');
+    const result = await callCloudFunction('save_all_data', { prompts, banners, users });
     console.log('[同步] 云端同步结果: ' + JSON.stringify(result));
   } catch (e) {
     console.log('[同步] 同步到云端失败:', e.message);
   }
 }
+
+// 数据变动时自动同步到云端（防抖）
+let syncDebounce = null;
+onDataChange(() => {
+  if (syncDebounce) clearTimeout(syncDebounce);
+  syncDebounce = setTimeout(() => syncToCloud(), 3000);
+});
 
 app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));

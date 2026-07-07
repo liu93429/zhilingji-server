@@ -317,10 +317,19 @@ async function initDatabase() {
   console.log('数据库初始化完成');
 }
 
+let onDataChangeCallback = null;
+
+function onDataChange(cb) {
+  onDataChangeCallback = cb;
+}
+
 function saveDatabase() {
   const data = db.export();
   const buffer = Buffer.from(data);
   fs.writeFileSync(dbPath, buffer);
+  if (onDataChangeCallback) {
+    try { onDataChangeCallback(); } catch(e) {}
+  }
 }
 
 function prepare(sql) {
@@ -376,5 +385,7 @@ function initDb() {
 
 module.exports = {
   db: originalDb,
-  initDb
+  initDb,
+  onDataChange,
+  saveDatabase
 };
