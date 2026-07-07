@@ -59,8 +59,8 @@ function callCloudFunction(action, data) {
         res.on('end', () => {
           try {
             const result = JSON.parse(body);
-            // 微信API返回格式：{ resp_body: "{ ... }" }
-            const respBody = result.resp_body ? JSON.parse(result.resp_body) : result;
+            // 微信API返回格式：{ errcode: 0, resp_data: "{ ... }" }
+            const respBody = result.resp_data ? JSON.parse(result.resp_data) : result;
             resolve(respBody);
           } catch (e) { reject(e); }
         });
