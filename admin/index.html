@@ -1079,7 +1079,7 @@
     let allUsers = [];         // 从 API 获取的用户列表缓存
     let allFeedbacks = [];     // 从 API 获取的反馈列表缓存
     let promptCategories = []; // 从指令列表中提取的分类
-    let commonTags = ['热门', '时尚', '写真', '古风', '港风', '复古', '水彩', '治愈', '校园', '赛博朋克', '创意', '胶片'];
+    let commonTags = JSON.parse(localStorage.getItem('admin_common_tags') || 'null') || ['热门', '时尚', '写真', '古风', '港风', '复古', '水彩', '治愈', '校园', '赛博朋克', '创意', '胶片'];
 
     // Banner 从后端 API 加载
     let banners = [];
@@ -2059,6 +2059,7 @@
       if (!name) { showToast('请输入标签名称', 'warning'); return; }
       if (commonTags.includes(name)) { showToast('该标签已存在', 'warning'); return; }
       commonTags.push(name);
+      localStorage.setItem('admin_common_tags', JSON.stringify(commonTags));
       input.value = '';
       renderCommonTags();
       showToast('标签已添加', 'success');
@@ -2067,6 +2068,7 @@
     function removeCommonTag(idx) {
       const tag = commonTags[idx];
       commonTags.splice(idx, 1);
+      localStorage.setItem('admin_common_tags', JSON.stringify(commonTags));
       renderCommonTags();
       showToast('已删除标签「' + tag + '」', 'info');
     }
