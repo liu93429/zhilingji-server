@@ -432,6 +432,58 @@ app.put('/api/user/info', (req, res) => {
   });
 });
 
+// 获取所有分类列表
+app.get('/api/categories', (req, res) => {
+  // 优先从 categories 表读取
+  let rows = db.prepare('SELECT name FROM categories ORDER BY sort ASC, id ASC').all();
+  if (rows.length === 0) {
+    // 如果 categories 表为空，从指令中提取
+    rows = db.prepare('SELECT DISTINCT category AS name FROM prompts WHERE category IS NOT NULL AND category != ""').all();
+  }
+  const categories = rows.map(r => r.name);
+  res.json({ code: 0, categories });
+});
+
+// 添加分类
+app.post('/api/admin/categories', (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.json({ code: 1, message: '分类名不能为空' });
+  try {
+    db.prepare('INSERT INTO categories (name) VALUES (?)').run(name.trim());
+    saveDatabase();
+    res.json({ code: 0, message: '添加成功' });
+  } catch (e) {
+    if (e.message.includes('UNIQUE')) return res.json({ code: 1, message: '该分类已存在' });
+    res.json({ code: 1, message: '添加失败' });
+  }
+});
+
+// 删除分类
+app.delete('/api/admin/categories/:name', (req, res) => {
+  const { name } = req.params;
+  const hasPrompts = db.prepare('SELECT COUNT(*) as cnt FROM prompts WHERE category = ?').get(name);
+  if (hasPrompts.cnt > 0) return res.json({ code: 1, message: '该分类下有指令，无法删除' });
+  db.prepare('DELETE FROM categories WHERE name = ?').run(name);
+  saveDatabase();
+  res.json({ code: 0, message: '删除成功' });
+});
+
+// 重命名分类
+app.put('/api/admin/categories/:oldName', (req, res) => {
+  const { oldName } = req.params;
+  const { name: newName } = req.body;
+  if (!newName) return res.json({ code: 1, message: '新名称不能为空' });
+  try {
+    db.prepare('UPDATE categories SET name = ? WHERE name = ?').run(newName.trim(), oldName);
+    db.prepare('UPDATE prompts SET category = ? WHERE category = ?').run(newName.trim(), oldName);
+    saveDatabase();
+    res.json({ code: 0, message: '重命名成功' });
+  } catch (e) {
+    if (e.message.includes('UNIQUE')) return res.json({ code: 1, message: '该分类名已存在' });
+    res.json({ code: 1, message: '重命名失败' });
+  }
+});
+
 app.get('/api/prompts', (req, res) => {
   const { category = 'all', keyword = '', sortBy = 'time', limit, page = 1, pageSize = 20 } = req.query;
   
