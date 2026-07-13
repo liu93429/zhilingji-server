@@ -2027,20 +2027,19 @@
       
       // 更新所有使用该分类的指令
       const oldPrompts = allPrompts.filter(p => p.category === original);
-      if (oldPrompts.length > 0) {
-        oldPrompts.forEach(p => {
-          fetch('/api/admin/prompts/' + p.id, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ category: newName })
-          }).catch(e => console.error('更新指令分类失败:', e));
-        });
-        allPrompts.forEach(p => { if (p.category === original) p.category = newName; });
-        renderPromptList();
-      }
+      const updatePromises = oldPrompts.map(p => {
+        return fetch('/api/admin/prompts/' + p.id, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category: newName })
+        }).catch(e => console.error('更新指令分类失败:', e));
+      });
       
+      // 先本地更新展示
+      allPrompts.forEach(p => { if (p.category === original) p.category = newName; });
       refreshCategorySelects();
       renderCategoryList();
+      renderPromptList();
       showToast('分类已重命名为「' + newName + '」，' + oldPrompts.length + ' 条指令已更新', 'success');
     }
 
