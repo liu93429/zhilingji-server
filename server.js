@@ -91,19 +91,14 @@ async function syncFromCloud() {
         const insert = db.prepare(`INSERT INTO prompts (id, title, description, content, category, tags, cover, images, copy_count, ad_unlock_count, view_count, is_top, weight, is_recommended, status, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
         for (const p of prompts) {
-          // 清洗不可见控制字符，防止乱码
-          const clean = (str) => {
-            if (!str) return '';
-            return String(str).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFD]/g, '');
-          };
           const images = Array.isArray(p.images) ? JSON.stringify(p.images) : (p.images || '[]');
           const tags = Array.isArray(p.tags) ? JSON.stringify(p.tags) : (p.tags || '[]');
           insert.run(
             p.id || 0,
-            clean(p.title),
-            clean(p.description),
-            clean(p.content),
-            clean(p.category),
+            p.title || '',
+            p.description || '',
+            p.content || p.prompt || p.promptText || '',
+            p.category || p.tag || '',
             tags,
             p.cover || p.image || '',
             images,
@@ -1167,19 +1162,16 @@ app.post('/api/admin/prompts', (req, res) => {
     return res.json({ code: 1, message: '标题和内容不能为空' });
   }
   
-  // 清洗控制字符
-  const cleanStr = (s) => String(s || '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFD]/g, '');
-  
   const stmt = db.prepare(`
     INSERT INTO prompts (title, description, content, category, tags, cover, images, is_top, weight, is_recommended)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   
   const result = stmt.run(
-    cleanStr(title),
-    cleanStr(description),
-    cleanStr(content),
-    cleanStr(category),
+    title,
+    description || '',
+    content,
+    category || '',
     JSON.stringify(tags),
     cover || '',
     JSON.stringify(images),
@@ -1206,12 +1198,11 @@ app.put('/api/admin/prompts/:id', (req, res) => {
   
   const fields = [];
   const values = [];
-  const cleanStr = (s) => String(s || '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFD]/g, '');
   
-  if (title !== undefined) { fields.push('title = ?'); values.push(cleanStr(title)); }
-  if (description !== undefined) { fields.push('description = ?'); values.push(cleanStr(description)); }
-  if (content !== undefined) { fields.push('content = ?'); values.push(cleanStr(content)); }
-  if (category !== undefined) { fields.push('category = ?'); values.push(cleanStr(category)); }
+  if (title !== undefined) { fields.push('title = ?'); values.push(title); }
+  if (description !== undefined) { fields.push('description = ?'); values.push(description); }
+  if (content !== undefined) { fields.push('content = ?'); values.push(content); }
+  if (category !== undefined) { fields.push('category = ?'); values.push(category); }
   if (tags !== undefined) { fields.push('tags = ?'); values.push(JSON.stringify(tags)); }
   if (cover !== undefined) { fields.push('cover = ?'); values.push(cover); }
   if (images !== undefined) { fields.push('images = ?'); values.push(JSON.stringify(images)); }
