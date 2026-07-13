@@ -2004,9 +2004,56 @@
         '<div class="flex items-center justify-between px-3 py-2.5 bg-gray-50 rounded-lg group">' +
         '<div class="flex items-center gap-2 flex-1 min-w-0">' +
         '<span class="w-2 h-2 rounded-full bg-brand flex-shrink-0"></span>' +
-        '<span class="text-sm text-gray-700">' + cat + '</span></div></div>'
+        '<input type="text" value="' + cat + '" data-idx="' + idx + '" data-original="' + cat + '" class="category-edit-input text-sm text-gray-700 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-brand focus:outline-none px-0 py-0 flex-1 min-w-0 transition-colors" onkeydown="if(event.key===\'Enter\'){event.preventDefault();saveCategoryEdit(this);}">' +
+        '</div>' +
+        '<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">' +
+        '<button type="button" onclick="saveCategoryEdit(this.parentElement.previousElementSibling.querySelector(\'.category-edit-input\'))" class="p-1 text-gray-400 hover:text-brand hover:bg-brand/10 rounded" title="保存"><i data-lucide="check" class="w-3.5 h-3.5"></i></button>' +
+        '<button type="button" onclick="deleteCategory(' + idx + ', \'' + cat.replace(/'/g, "\\'") + '\')" class="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded" title="删除"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>' +
+        '</div></div>'
       ).join('');
       lucide.createIcons();
+    }
+
+    function saveCategoryEdit(input) {
+      const idx = parseInt(input.dataset.idx);
+      const original = input.dataset.original;
+      const newName = input.value.trim();
+      if (!newName) { showToast('分类名不能为空', 'warning'); input.value = original; return; }
+      if (newName === original) return;
+      if (promptCategories.includes(newName)) { showToast('该分类已存在', 'warning'); input.value = original; return; }
+      
+      // 更新分类名
+      promptCategories[idx] = newName;
+      
+      // 更新所有使用该分类的指令
+      const oldPrompts = allPrompts.filter(p => p.category === original);
+      if (oldPrompts.length > 0) {
+        oldPrompts.forEach(p => {
+          fetch('/api/admin/prompts/' + p.id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ category: newName })
+          }).catch(e => console.error('更新指令分类失败:', e));
+        });
+        allPrompts.forEach(p => { if (p.category === original) p.category = newName; });
+        renderPromptList();
+      }
+      
+      refreshCategorySelects();
+      renderCategoryList();
+      showToast('分类已重命名为「' + newName + '」，' + oldPrompts.length + ' 条指令已更新', 'success');
+    }
+
+    function deleteCategory(idx, cat) {
+      const promptsWithCat = allPrompts.filter(p => p.category === cat);
+      if (promptsWithCat.length > 0) {
+        showToast('该分类下有 ' + promptsWithCat.length + ' 条指令，请先移动到其他分类', 'warning');
+        return;
+      }
+      promptCategories.splice(idx, 1);
+      refreshCategorySelects();
+      renderCategoryList();
+      showToast('已删除分类「' + cat + '」', 'info');
     }
 
     function addCategory() {
