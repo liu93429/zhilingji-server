@@ -16,6 +16,60 @@ const SYNC_SECRET = 'zhilingji_sync_2024';
 let accessToken = '';
 let tokenExpireTime = 0;
 
+// ── UTF-8 合法性校验：拦截含乱码（U+FFFD 替换符 / 无效字节 / mojibake 误解码）的文本入库 ──
+// 根因：从微信聊天、网页富文本等复制粘贴时，字节在进门之前就已损坏，或 UTF-8 被当成 Latin-1/CP1252 误解码。
+// 写入前校验可把脏数据拦在保存这一步，避免写进库里。
+function hasGarbledText(value) {
+  if (typeof value !== 'string') return false;
+  const v = value;
+  // 1) 替换符 U+FFFD = 字节被错误解码的标志，必拦
+  if (v.indexOf('\uFFFD') !== -1) return true;
+  // 2) 往返编码校验：合法 UTF-8 文本编码后再解码应与原文一致（捕获孤立代理项等）
+  try {
+    if (Buffer.from(v, 'utf8').toString('utf8') !== v) return true;
+  } catch (e) {
+    return true;
+  }
+  // 3) Mojibake 探测：UTF-8 字节被当成 Latin-1/CP1252 误解码后的 "é›ªè•½" / "â€"" / "Ã©" 等特征
+  if (looksLikeMojibake(v)) return true;
+  return false;
+}
+
+// Mojibake 探测：把 str 的码点按 latin1 还原成字节，再尝试按 UTF-8 解出；
+// 若解码结果含中日韩文字，说明原文是 UTF-8 被误解码的字符，判定为乱码。
+function looksLikeMojibake(str) {
+  // 快捷排除：mojibake artifact 必然含高位 Latin-1 字节产物（0x80-0xFF）；无此特征直接放行
+  if (!/[\u0080-\u00FF]/.test(str)) return false;
+  // 把每个码点当作一个 Latin-1 字节（取低 8 位）还原成原始字节流
+  const bytes = Buffer.from(str, 'latin1');
+  // 候选 A：直接按 UTF-8 解
+  const a = safeUtf8(bytes);
+  if (a && a !== str && hasCJK(a)) return true;
+  // 候选 B：双重误解码（"Ã©" 型），把 A 再按 latin1 还原后 UTF-8 解
+  if (a) {
+    const b = safeUtf8(Buffer.from(a, 'latin1'));
+    if (b && b !== str && hasCJK(b)) return true;
+  }
+  return false;
+}
+
+// 安全 UTF-8 解码：字节非法（含替换符）返回 null，避免把"Latin-1 正常词"误判为乱码
+function safeUtf8(buf) {
+  let s;
+  try {
+    s = buf.toString('utf8');
+  } catch (e) {
+    return null;
+  }
+  if (s.indexOf('\uFFFD') !== -1) return null;
+  return s;
+}
+
+// 是否含中日韩统一表意文字（CJK 误解码的还原目标）
+function hasCJK(s) {
+  return /[\u4e00-\u9fff\u3400-\u4dbf]/.test(s);
+}
+
 // 获取 access_token
 function getAccessToken() {
   if (accessToken && Date.now() < tokenExpireTime) {
@@ -1208,17 +1262,23 @@ app.get('/api/admin/prompts', (req, res) => {
 });
 
 app.post('/api/admin/prompts', (req, res) => {
-  const { title, description, content, category, tags = [], cover, images = [], is_top = 0, weight = 1, is_recommended = 0 } = req.body;
-  
+  const { title, description, content, category, tags = [], cover, images = [], is_top = 0, weight = 1, is_recommended = 0, tip = '' } = req.body;
+
   if (!title || !content) {
     return res.json({ code: 1, message: '标题和内容不能为空' });
   }
-  
+
+  // UTF-8 校验：拦截含乱码的文本（防止脏数据入库）
+  const textFields = [title, content, description, category, tip, ...(Array.isArray(tags) ? tags : [])];
+  if (textFields.some(hasGarbledText)) {
+    return res.json({ code: 1, message: '指令内容包含乱码（非法字符），请检查后重新输入' });
+  }
+
   const stmt = db.prepare(`
-    INSERT INTO prompts (title, description, content, category, tags, cover, images, is_top, weight, is_recommended)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO prompts (title, description, content, category, tags, cover, images, is_top, weight, is_recommended, tip)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  
+
   const result = stmt.run(
     title,
     description || '',
@@ -1229,7 +1289,8 @@ app.post('/api/admin/prompts', (req, res) => {
     JSON.stringify(images),
     is_top ? 1 : 0,
     weight,
-    is_recommended ? 1 : 0
+    is_recommended ? 1 : 0,
+    tip || ''
   );
   
   res.json({
@@ -1241,16 +1302,23 @@ app.post('/api/admin/prompts', (req, res) => {
 
 app.put('/api/admin/prompts/:id', (req, res) => {
   const { id } = req.params;
-  const { title, description, content, category, tags, cover, images, is_top, weight, is_recommended, status } = req.body;
-  
+  const { title, description, content, category, tags, cover, images, is_top, weight, is_recommended, status, tip } = req.body;
+
   const existing = db.prepare('SELECT * FROM prompts WHERE id = ?').get(id);
   if (!existing) {
     return res.json({ code: 1, message: '指令不存在' });
   }
-  
+
+  // UTF-8 校验：仅校验本次提交里提供的文本字段
+  const updateText = [title, description, content, category, tip].filter(v => v !== undefined);
+  if (Array.isArray(tags)) updateText.push(...tags);
+  if (updateText.some(hasGarbledText)) {
+    return res.json({ code: 1, message: '指令内容包含乱码（非法字符），请检查后重新输入' });
+  }
+
   const fields = [];
   const values = [];
-  
+
   if (title !== undefined) { fields.push('title = ?'); values.push(title); }
   if (description !== undefined) { fields.push('description = ?'); values.push(description); }
   if (content !== undefined) { fields.push('content = ?'); values.push(content); }
@@ -1261,6 +1329,7 @@ app.put('/api/admin/prompts/:id', (req, res) => {
   if (is_top !== undefined) { fields.push('is_top = ?'); values.push(is_top ? 1 : 0); }
   if (weight !== undefined) { fields.push('weight = ?'); values.push(weight); }
   if (is_recommended !== undefined) { fields.push('is_recommended = ?'); values.push(is_recommended ? 1 : 0); }
+  if (tip !== undefined) { fields.push('tip = ?'); values.push(tip); }
   if (status !== undefined) { fields.push('status = ?'); values.push(status); }
   
   fields.push('updated_at = CURRENT_TIMESTAMP');
@@ -1391,6 +1460,11 @@ app.post('/api/admin/banners', (req, res) => {
   if (!title) {
     return res.json({ code: 1, message: '请输入 Banner 标题' });
   }
+  // UTF-8 校验：拦截含乱码的文本
+  const bannerText = [title, subtitle, linkParam, gradientStart, gradientEnd];
+  if (bannerText.some(hasGarbledText)) {
+    return res.json({ code: 1, message: 'Banner 内容包含乱码（非法字符），请检查后重新输入' });
+  }
   const result = db.prepare(
     'INSERT INTO banners (title, subtitle, image, link_type, link_param, gradient_start, gradient_end, sort, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(title, subtitle, image, linkType, linkParam, gradientStart, gradientEnd, parseInt(sort) || 0, 'active');
@@ -1405,6 +1479,11 @@ app.put('/api/admin/banners/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM banners WHERE id = ?').get(id);
   if (!existing) {
     return res.json({ code: 1, message: 'Banner 不存在' });
+  }
+  // UTF-8 校验：仅校验本次提交里提供的文本字段
+  const bannerText = [title, subtitle, linkParam, gradientStart, gradientEnd].filter(v => v !== undefined);
+  if (bannerText.some(hasGarbledText)) {
+    return res.json({ code: 1, message: 'Banner 内容包含乱码（非法字符），请检查后重新输入' });
   }
   const fields = [];
   const values = [];

@@ -69,6 +69,19 @@ async function initDatabase() {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
+    // 迁移：prompts 增加 tip 列（使用小贴士）。
+    // 已存在库不会重跑上面的 CREATE TABLE IF NOT EXISTS，需手动 ALTER 补列。
+    try {
+      const _pragma = db.exec("PRAGMA table_info(prompts)");
+      const _cols = _pragma[0] ? _pragma[0].values.map(r => r[1]) : [];
+      if (!_cols.includes('tip')) {
+        db.run("ALTER TABLE prompts ADD COLUMN tip TEXT DEFAULT ''");
+        console.log('[迁移] prompts 表已新增 tip 列');
+      }
+    } catch (e) {
+      console.warn('[迁移] 检查/新增 tip 列失败:', e.message);
+    }
+
     CREATE TABLE IF NOT EXISTS purchased (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_openid TEXT NOT NULL,
